@@ -28,12 +28,15 @@ app.use('/api/register', registerRouter);
 app.use('/api/registrations', registerRouter);  // GET /api/registrations returns all leads
 app.use('/api/cases', casesRouter);
 
-// Admin page
+// Admin SPA — all /admin/* routes serve admin.html (React Router handles routing)
+app.get('/admin/*', (_req, res) => {
+  res.sendFile(join(ROOT, 'public', 'admin.html'));
+});
 app.get('/admin', (_req, res) => {
   res.sendFile(join(ROOT, 'public', 'admin.html'));
 });
 
-// SPA fallback
+// Landing page SPA fallback
 app.get('*', (_req, res) => {
   res.sendFile(join(ROOT, 'public', 'index.html'));
 });
