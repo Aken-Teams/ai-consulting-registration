@@ -1,0 +1,10 @@
+node_modules/
+dist/
+data/registrations.json
+*.map
+bun.lockb
+bun.lock
+.claude/
+CLAUDE.md
+**/CLAUDE.md
+PLAN.md
