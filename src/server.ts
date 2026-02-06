@@ -123,6 +123,11 @@ app.get('/api/registrations', async (_req, res) => {
   }
 });
 
+// Admin page
+app.get('/admin', (_req, res) => {
+  res.sendFile(join(ROOT, 'public', 'admin.html'));
+});
+
 // SPA fallback
 app.get('*', (_req, res) => {
   res.sendFile(join(ROOT, 'public', 'index.html'));

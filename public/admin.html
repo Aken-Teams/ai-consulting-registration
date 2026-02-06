@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>報名管理後台 — AI 輔能諮詢</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    .admin-header {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .admin-header h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .admin-header h1 .icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 900;
+    }
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .badge {
+      background: #ede9fe;
+      color: #6366f1;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+    .btn-refresh {
+      padding: 8px 16px;
+      background: #6366f1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .btn-refresh:hover { background: #4f46e5; }
+    .btn-back {
+      padding: 8px 16px;
+      background: white;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-back:hover { background: #f8fafc; color: #1e293b; }
+
+    /* Stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px 24px;
+      border: 1px solid #e2e8f0;
+    }
+    .stat-card .stat-label {
+      font-size: 0.8125rem;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+    .stat-card .stat-value {
+      font-size: 1.75rem;
+      font-weight: 900;
+      color: #1e293b;
+    }
+
+    /* Table */
+    .table-wrap {
+      padding: 0 24px 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+    }
+    .table-scroll {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    thead {
+      background: #f8fafc;
+      position: sticky;
+      top: 0;
+    }
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: #64748b;
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbfc; }
+
+    .company-name {
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .contact-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .contact-name { font-weight: 600; }
+    .contact-title { font-size: 0.8125rem; color: #64748b; }
+    .contact-detail {
+      font-size: 0.8125rem;
+      color: #64748b;
+    }
+    .need-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .need-tag {
+      padding: 2px 8px;
+      background: #ede9fe;
+      color: #6366f1;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .desc-cell {
+      max-width: 240px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.8125rem;
+      color: #475569;
+    }
+    .time-cell {
+      font-size: 0.8125rem;
+      color: #64748b;
+      white-space: nowrap;
+    }
+    .size-badge {
+      padding: 2px 8px;
+      background: #f0fdf4;
+      color: #16a34a;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 80px 24px;
+      color: #94a3b8;
+    }
+    .empty-state .empty-icon { font-size: 3rem; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 1.125rem; color: #64748b; margin-bottom: 8px; }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 60px 24px;
+      color: #64748b;
+    }
+    .loading-spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e2e8f0;
+      border-radius: 50%;
+      border-top-color: #6366f1;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Detail modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 16px;
+      max-width: 560px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 32px;
+    }
+    .modal h2 {
+      font-size: 1.25rem;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-size: 1.125rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+    }
+    .modal-close:hover { background: #e2e8f0; }
+    .detail-row {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.9375rem;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: #64748b; font-weight: 500; }
+    .detail-value { color: #1e293b; word-break: break-word; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); padding: 16px; gap: 12px; }
+      .table-wrap { padding: 0 16px 16px; }
+      .admin-header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+      .admin-header h1 { font-size: 1.0625rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-header">
+    <h1><span class="icon">AI</span> 報名管理後台</h1>
+    <div class="header-actions">
+      <span class="badge" id="count-badge">0 筆報名</span>
+      <button class="btn-refresh" onclick="loadData()">重新整理</button>
+      <a class="btn-back" href="/">回到首頁</a>
+    </div>
+  </div>
+
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="stat-label">總報名數</div><div class="stat-value" id="stat-total">-</div></div>
+    <div class="stat-card"><div class="stat-label">今日報名</div><div class="stat-value" id="stat-today">-</div></div>
+    <div class="stat-card"><div class="stat-label">最常見需求</div><div class="stat-value" id="stat-top-need" style="font-size:1.125rem">-</div></div>
+    <div class="stat-card"><div class="stat-label">最常見規模</div><div class="stat-value" id="stat-top-size" style="font-size:1.125rem">-</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-container">
+      <div class="table-scroll">
+        <div id="loading" class="loading">
+          <div class="loading-spinner"></div>
+          <p>載入中...</p>
+        </div>
+        <table id="data-table" style="display:none">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>公司</th>
+              <th>聯絡人</th>
+              <th>Email / 電話</th>
+              <th>規模</th>
+              <th>需求類型</th>
+              <th>需求描述</th>
+              <th>報名時間</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state" style="display:none">
+          <div class="empty-icon">📋</div>
+          <h3>還沒有人報名</h3>
+          <p>報名資料會顯示在這裡</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <h2>報名詳情 <button class="modal-close" onclick="closeModal()">&times;</button></h2>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script>
+    async function loadData() {
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('data-table');
+      const empty = document.getElementById('empty-state');
+      loading.style.display = 'block';
+      table.style.display = 'none';
+      empty.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/registrations');
+        const json = await res.json();
+        const data = (json.data || []).reverse();
+
+        document.getElementById('count-badge').textContent = data.length + ' 筆報名';
+        document.getElementById('stat-total').textContent = data.length;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const todayCount = data.filter(d => d.submittedAt.slice(0, 10) === today).length;
+        document.getElementById('stat-today').textContent = todayCount;
+
+        // Top need
+        const needCount = {};
+        data.forEach(d => (d.needTypes || []).forEach(n => { needCount[n] = (needCount[n] || 0) + 1; }));
+        const topNeed = Object.entries(needCount).sort((a, b) => b[1] - a[1])[0];
+        document.getElementById('stat-top-need').textContent = topNeed ? topNeed[0] : '-';
+
+        // Top size
+        const sizeCount = {};
+        data.forEach(d => { if (d.companySize) sizeCount[d.companySize] = (sizeCount[d.companySize] || 0) + 1; });
+        const topSize = Object.entries(sizeCount).sort((a, b) => b[1] - a[1])[0];
+        document.getElementById('stat-top-size').textContent = topSize ? topSize[0] : '-';
+
+        loading.style.display = 'none';
+
+        if (data.length === 0) {
+          empty.style.display = 'block';
+          return;
+        }
+
+        table.style.display = 'table';
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+
+        data.forEach((d, i) => {
+          const tr = document.createElement('tr');
+          tr.style.cursor = 'pointer';
+          tr.onclick = () => showDetail(d);
+
+          const time = new Date(d.submittedAt);
+          const timeStr = time.toLocaleDateString('zh-TW') + ' ' + time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+
+          tr.innerHTML =
+            '<td>' + (i + 1) + '</td>' +
+            '<td><span class="company-name">' + esc(d.company) + '</span></td>' +
+            '<td><div class="contact-info"><span class="contact-name">' + esc(d.contactName) + '</span>' +
+            (d.title ? '<span class="contact-title">' + esc(d.title) + '</span>' : '') + '</div></td>' +
+            '<td><div class="contact-info"><span class="contact-detail">' + esc(d.email) + '</span>' +
+            '<span class="contact-detail">' + esc(d.phone) + '</span></div></td>' +
+            '<td><span class="size-badge">' + esc(d.companySize) + '</span></td>' +
+            '<td><div class="need-tags">' + (d.needTypes || []).map(n => '<span class="need-tag">' + esc(n) + '</span>').join('') + '</div></td>' +
+            '<td><div class="desc-cell">' + (d.description ? esc(d.description) : '<span style="color:#cbd5e1">未填寫</span>') + '</div></td>' +
+            '<td><span class="time-cell">' + timeStr + '</span></td>';
+
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        loading.innerHTML = '<p style="color:#ef4444">載入失敗，請稍後再試</p>';
+      }
+    }
+
+    function esc(str) {
+      const d = document.createElement('div');
+      d.textContent = str || '';
+      return d.innerHTML;
+    }
+
+    function showDetail(d) {
+      const time = new Date(d.submittedAt);
+      const timeStr = time.toLocaleDateString('zh-TW') + ' ' + time.toLocaleTimeString('zh-TW');
+      const fields = [
+        ['公司', d.company],
+        ['聯絡人', d.contactName],
+        ['職稱', d.title || '-'],
+        ['Email', d.email],
+        ['電話', d.phone],
+        ['規模', d.companySize],
+        ['需求類型', (d.needTypes || []).join('、')],
+        ['需求描述', d.description || '-'],
+        ['報名時間', timeStr],
+        ['ID', d.id],
+      ];
+      document.getElementById('modal-content').innerHTML = fields.map(([l, v]) =>
+        '<div class="detail-row"><span class="detail-label">' + l + '</span><span class="detail-value">' + esc(v) + '</span></div>'
+      ).join('');
+      document.getElementById('modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    loadData();
+  </script>
+</body>
+</html>
