@@ -756,33 +756,26 @@ a {
 
 /* ===== Registration Form ===== */
 .register-section {
-  background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%);
-  color: white;
+  background: #f8fafc;
+  color: var(--text);
 }
 
 .register-section .section-title {
-  color: white;
-}
-
-.register-section .section-title .highlight {
-  background: linear-gradient(135deg, #fb923c, #fbbf24);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .register-section .section-subtitle {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-light);
 }
 
 .reg-form {
   max-width: 720px;
   margin: 0 auto;
   padding: clamp(24px, 5vw, 40px);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: white;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-lg);
 }
 
 .form-row {
@@ -798,9 +791,9 @@ a {
 .form-group label {
   display: block;
   font-size: 0.9375rem;
-  font-weight: 500;
+  font-weight: 600;
   margin-bottom: 8px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text);
 }
 
 .form-group input,
@@ -808,38 +801,39 @@ a {
 .form-group textarea {
   width: 100%;
   padding: 12px 16px;
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.06);
-  color: white;
+  background: var(--bg-alt);
+  color: var(--text);
   font-size: 16px;
   transition: border-color var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast);
 }
 
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-lighter);
 }
 
 .form-group select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='rgba(255,255,255,0.5)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M6 8L1 3h10z' fill='%2364748b'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 16px center;
   padding-right: 40px;
 }
 
 .form-group select option {
-  background: #1e1b4b;
-  color: white;
+  background: white;
+  color: var(--text);
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: var(--primary-light);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  background: white;
   transform: scale(1.01);
 }
 
@@ -851,7 +845,7 @@ a {
 .field-error {
   display: block;
   font-size: 0.8125rem;
-  color: #fca5a5;
+  color: #dc2626;
   margin-top: 6px;
   animation: slideDown var(--duration-fast) var(--ease-out);
 }
@@ -873,12 +867,14 @@ a {
   gap: 8px;
   padding: 10px 16px;
   min-height: 48px;
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius);
   font-size: 0.9375rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text);
+  background: var(--bg-alt);
 }
 
 .checkbox-label input {
@@ -889,16 +885,16 @@ a {
   display: inline-block;
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--text-lighter);
   border-radius: 4px;
   transition: all var(--duration-fast) var(--ease-spring);
   position: relative;
 }
 
 .checkbox-label.checked {
-  border-color: var(--primary-light);
-  background: rgba(99, 102, 241, 0.15);
-  color: white;
+  border-color: var(--primary);
+  background: #ede9fe;
+  color: var(--primary-dark);
 }
 
 .checkbox-label.checked .checkbox-custom {
@@ -921,10 +917,10 @@ a {
 
 .server-error {
   padding: 12px 16px;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: var(--radius);
-  color: #fca5a5;
+  color: #dc2626;
   font-size: 0.9375rem;
   margin-bottom: 20px;
   animation: slideDown var(--duration-fast) var(--ease-out);
@@ -951,7 +947,7 @@ a {
 .form-privacy {
   text-align: center;
   font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-lighter);
   margin-top: 16px;
 }
 
@@ -961,10 +957,10 @@ a {
   margin: 0 auto;
   text-align: center;
   padding: 60px 40px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: white;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-lg);
   animation: successIn 0.5s var(--ease-out) both;
 }
 
@@ -985,13 +981,13 @@ a {
 }
 
 .success-card p {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-light);
   margin-bottom: 8px;
 }
 
 .success-note {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: var(--text-lighter) !important;
   margin-bottom: 24px !important;
 }
 
