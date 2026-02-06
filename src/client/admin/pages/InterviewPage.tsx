@@ -251,7 +251,21 @@ export function InterviewPage() {
         {/* Right: PRD Preview */}
         <aside className="prd-panel">
           <div className="prd-panel-header">
-            <h3>PRD 即時預覽</h3>
+            <div className="prd-panel-title-row">
+              <h3>PRD 即時預覽</h3>
+              <div className="prd-export-btns">
+                <button className="btn-export-sm" onClick={() => {
+                  authFetch(`/api/cases/${caseId}/prd/export?format=md`).then(r => r.blob()).then(b => {
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `PRD.md`; a.click();
+                  });
+                }}>MD</button>
+                <button className="btn-export-sm" onClick={() => {
+                  authFetch(`/api/cases/${caseId}/prd/export?format=pdf`).then(r => r.blob()).then(b => {
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `PRD.pdf`; a.click();
+                  });
+                }}>PDF</button>
+              </div>
+            </div>
             <span className="completeness-bar">
               <span style={{ width: `${completeness}%` }} />
             </span>

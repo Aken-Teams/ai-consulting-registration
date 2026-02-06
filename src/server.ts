@@ -10,6 +10,7 @@ import authRouter from './routes/auth.js';
 import registerRouter from './routes/register.js';
 import casesRouter from './routes/cases.js';
 import sessionsRouter from './routes/sessions.js';
+import prdRouter from './routes/prd.js';
 import { setupSocketIO } from './socket.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,8 +39,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/register', registerRouter);
 app.use('/api/registrations', registerRouter);
 app.use('/api/cases', casesRouter);
-app.use('/api/cases', sessionsRouter);  // /api/cases/:caseId/sessions, /api/cases/:caseId/prd
+app.use('/api/cases', sessionsRouter);  // /api/cases/:caseId/sessions
 app.use('/api/sessions', sessionsRouter);  // /api/sessions/:id
+app.use('/api/cases', prdRouter);  // /api/cases/:caseId/prd/*
 
 // Admin SPA
 app.get('/admin/*', (_req, res) => {

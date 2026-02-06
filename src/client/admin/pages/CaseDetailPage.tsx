@@ -25,7 +25,7 @@ interface CaseDetail {
   completedAt: string | null;
   createdAt: string;
   lead: Lead;
-  sessions: Array<{ id: number; startedAt: string; endedAt: string | null }>;
+  sessions: Array<{ id: number; startedAt: string; endedAt: string | null; durationSeconds: number | null }>;
   prdVersions: Array<{ id: number; versionNumber: number; isLocked: boolean; createdAt: string }>;
 }
 
@@ -44,11 +44,12 @@ const STATUS_OPTIONS = ['new', 'scheduled', 'interviewing', 'pending_review', 'p
 
 export function CaseDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { authFetch } = useAuth();
+  const { authFetch, token } = useAuth();
   const navigate = useNavigate();
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [locking, setLocking] = useState(false);
 
   useEffect(() => {
     loadCase();
@@ -85,10 +86,51 @@ export function CaseDetailPage() {
     }
   }
 
+  async function lockPrd() {
+    setLocking(true);
+    try {
+      const res = await authFetch(`/api/cases/${id}/prd/lock`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        await loadCase();
+      } else {
+        alert(data.message || '鎖版失敗');
+      }
+    } catch (err) {
+      console.error('Failed to lock PRD:', err);
+    } finally {
+      setLocking(false);
+    }
+  }
+
+  function downloadPrd(format: 'md' | 'pdf', versionNumber?: number) {
+    const vParam = versionNumber ? `&version=${versionNumber}` : '';
+    const url = `/api/cases/${id}/prd/export?format=${format}${vParam}`;
+    // Use a hidden link with auth header via fetch+blob
+    authFetch(url).then(res => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    }).then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const ext = format === 'pdf' ? 'pdf' : 'md';
+      a.download = `PRD_v${versionNumber || 'latest'}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }).catch(err => {
+      console.error('Download failed:', err);
+      alert('匯出失敗');
+    });
+  }
+
   if (loading) return <div className="admin-loading">載入中...</div>;
   if (!caseData) return <div className="admin-loading">找不到案件</div>;
 
   const { lead } = caseData;
+  const hasUnlockedDraft = caseData.prdVersions.some(v => !v.isLocked);
+  const latestVersion = caseData.prdVersions.length > 0
+    ? caseData.prdVersions.reduce((a, b) => a.versionNumber > b.versionNumber ? a : b)
+    : null;
 
   return (
     <div className="case-detail">
@@ -156,7 +198,10 @@ export function CaseDetailPage() {
           ) : (
             <ul className="session-list">
               {caseData.sessions.map(s => (
-                <li key={s.id}>Session #{s.id} — {new Date(s.startedAt).toLocaleString('zh-TW')}</li>
+                <li key={s.id}>
+                  Session #{s.id} — {new Date(s.startedAt).toLocaleString('zh-TW')}
+                  {s.durationSeconds != null && <span className="session-duration"> ({Math.round(s.durationSeconds / 60)} 分鐘)</span>}
+                </li>
               ))}
             </ul>
           )}
@@ -165,13 +210,35 @@ export function CaseDetailPage() {
           {caseData.prdVersions.length === 0 ? (
             <p className="empty-hint">尚無 PRD 版本，訪談後自動產生</p>
           ) : (
-            <ul className="session-list">
-              {caseData.prdVersions.map(v => (
-                <li key={v.id}>
-                  v{v.versionNumber} {v.isLocked ? '🔒' : '📝'} — {new Date(v.createdAt).toLocaleString('zh-TW')}
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className="prd-version-list">
+                {caseData.prdVersions
+                  .sort((a, b) => b.versionNumber - a.versionNumber)
+                  .map(v => (
+                  <li key={v.id} className="prd-version-item">
+                    <div className="prd-version-info">
+                      <span className="prd-version-label">
+                        v{v.versionNumber} {v.isLocked ? '(已鎖版)' : '(草稿)'}
+                      </span>
+                      <span className="prd-version-date">{new Date(v.createdAt).toLocaleString('zh-TW')}</span>
+                    </div>
+                    <div className="prd-version-actions">
+                      <button className="btn-export-sm" onClick={() => downloadPrd('md', v.versionNumber)}>MD</button>
+                      <button className="btn-export-sm" onClick={() => downloadPrd('pdf', v.versionNumber)}>PDF</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {hasUnlockedDraft && (
+                <button
+                  className="btn-lock-prd"
+                  onClick={lockPrd}
+                  disabled={locking}
+                >
+                  {locking ? '鎖版中...' : '鎖定 PRD 版本'}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

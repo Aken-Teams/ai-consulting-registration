@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/index.js';
-import { sessions, transcripts, cases, prdVersions } from '../db/schema.js';
-import { eq, desc, and } from 'drizzle-orm';
+import { sessions, transcripts, cases } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -92,27 +92,6 @@ router.patch('/:id', async (req, res) => {
     res.json({ success: true, data: updated });
   } catch (err) {
     console.error('End session error:', err);
-    res.status(500).json({ success: false, message: '伺服器錯誤' });
-  }
-});
-
-// GET /api/cases/:caseId/prd — get latest PRD
-router.get('/:caseId/prd', async (req, res) => {
-  try {
-    const caseId = parseInt(req.params.caseId);
-    if (isNaN(caseId)) {
-      res.status(400).json({ success: false, message: '無效的案件 ID' });
-      return;
-    }
-
-    const [prd] = await db.select().from(prdVersions)
-      .where(eq(prdVersions.caseId, caseId))
-      .orderBy(desc(prdVersions.versionNumber))
-      .limit(1);
-
-    res.json({ success: true, data: prd || null });
-  } catch (err) {
-    console.error('Get PRD error:', err);
     res.status(500).json({ success: false, message: '伺服器錯誤' });
   }
 });

@@ -450,6 +450,86 @@ td {
   border-bottom: 1px solid #f1f5f9;
 }
 
+/* ─── PRD Version List ─── */
+.prd-version-list {
+  list-style: none;
+  margin-top: 8px;
+}
+.prd-version-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+  gap: 8px;
+}
+.prd-version-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prd-version-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+.prd-version-date {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+.prd-version-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.btn-export-sm {
+  padding: 3px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  color: #6366f1;
+  transition: all 0.15s;
+}
+.btn-export-sm:hover {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+}
+.btn-lock-prd {
+  margin-top: 12px;
+  width: 100%;
+  padding: 8px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+.btn-lock-prd:hover { background: #d97706; }
+.btn-lock-prd:disabled { opacity: 0.5; cursor: not-allowed; }
+.session-duration {
+  color: #94a3b8;
+  font-size: 0.8125rem;
+}
+.prd-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.prd-export-btns {
+  display: flex;
+  gap: 4px;
+}
+
 /* ─── Interview Button ─── */
 .btn-start-interview {
   padding: 8px 20px;

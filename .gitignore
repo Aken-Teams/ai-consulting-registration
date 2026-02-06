@@ -1,6 +1,7 @@
 node_modules/
 dist/
 data/registrations.json
+data/artifacts/
 .env
 drizzle/
 *.map
