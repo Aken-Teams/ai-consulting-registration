@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 const cases = [
   {
@@ -32,6 +32,31 @@ export function UseCases() {
     document.getElementById('register')?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      const scrollLeft = el.scrollLeft;
+      const itemWidth = el.children[0]?.clientWidth || 1;
+      const gap = 16;
+      setActiveIndex(Math.round(scrollLeft / (itemWidth + gap)));
+    };
+
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToDot = (i: number) => {
+    const el = carouselRef.current;
+    if (!el || !el.children[i]) return;
+    const child = el.children[i] as HTMLElement;
+    el.scrollTo({ left: child.offsetLeft - 16, behavior: 'smooth' });
+  };
+
   return (
     <section className="section use-cases" id="use-cases">
       <div className="container">
@@ -42,6 +67,7 @@ export function UseCases() {
           不管您的需求是大是小，只要能說清楚，我們就能做出來。
         </p>
 
+        {/* Desktop grid */}
         <div className="cases-grid">
           {cases.map((c, i) => (
             <div className="case-card reveal" key={i} style={{ animationDelay: `${i * 0.1}s` }}>
@@ -54,6 +80,32 @@ export function UseCases() {
                 ))}
               </div>
             </div>
+          ))}
+        </div>
+
+        {/* Mobile carousel */}
+        <div className="cases-carousel" ref={carouselRef}>
+          {cases.map((c, i) => (
+            <div className="case-card" key={i}>
+              <span className="case-icon">{c.icon}</span>
+              <h3 className="case-title">{c.title}</h3>
+              <p className="case-desc">{c.desc}</p>
+              <div className="case-tags">
+                {c.tags.map((t) => (
+                  <span className="tag" key={t}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="carousel-dots">
+          {cases.map((_, i) => (
+            <button
+              key={i}
+              className={`carousel-dot${i === activeIndex ? ' active' : ''}`}
+              onClick={() => scrollToDot(i)}
+              aria-label={`第 ${i + 1} 張`}
+            />
           ))}
         </div>
 

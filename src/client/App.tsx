@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { PainPoints } from './components/PainPoints';
@@ -11,6 +11,8 @@ import './styles/global.css';
 import './styles/animations.css';
 
 export function App() {
+  const [scrollProgress, setScrollProgress] = useState(0);
+
   useEffect(() => {
     // Scroll-reveal observer
     const observer = new IntersectionObserver(
@@ -27,11 +29,28 @@ export function App() {
 
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
 
-    return () => observer.disconnect();
+    // Scroll progress
+    const onScroll = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      setScrollProgress(docHeight > 0 ? scrollTop / docHeight : 0);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('scroll', onScroll);
+    };
   }, []);
 
   return (
     <>
+      <div className="scroll-progress">
+        <div
+          className="scroll-progress-bar"
+          style={{ transform: `scaleX(${scrollProgress})` }}
+        />
+      </div>
       <Header />
       <main>
         <Hero />
