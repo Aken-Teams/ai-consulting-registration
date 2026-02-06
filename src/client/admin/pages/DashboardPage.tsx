@@ -59,8 +59,10 @@ export function DashboardPage() {
   const { authFetch } = useAuth();
   const navigate = useNavigate();
   const [cases, setCases] = useState<CaseRow[]>([]);
+  const [allCases, setAllCases] = useState<CaseRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,12 +72,14 @@ export function DashboardPage() {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (status) params.set('status', status);
 
-      const [casesRes, leadsRes] = await Promise.all([
+      const [casesRes, leadsRes, allCasesRes] = await Promise.all([
         authFetch(`/api/cases?${params}`),
         authFetch('/api/registrations'),
+        authFetch('/api/cases?limit=100'),
       ]);
       const casesData = await casesRes.json();
       const leadsData = await leadsRes.json();
+      const allCasesData = await allCasesRes.json();
 
       if (casesData.success) {
         setCases(casesData.data);
@@ -83,6 +87,9 @@ export function DashboardPage() {
       }
       if (leadsData.success) {
         setLeads(leadsData.data);
+      }
+      if (allCasesData.success) {
+        setAllCases(allCasesData.data);
       }
     } catch (err) {
       console.error('Failed to fetch data:', err);
@@ -97,6 +104,7 @@ export function DashboardPage() {
 
   const handleStatusFilter = (status: string) => {
     setStatusFilter(status);
+    setSearchQuery('');
     fetchData(1, status);
   };
 
@@ -104,15 +112,27 @@ export function DashboardPage() {
     fetchData(page, statusFilter);
   };
 
-  // Stats
+  // Stats from all cases (not just current page)
   const totalLeads = leads.length;
   const today = new Date().toISOString().slice(0, 10);
   const todayLeads = leads.filter(l => l.createdAt.slice(0, 10) === today).length;
   const statusCounts: Record<string, number> = {};
-  cases.forEach(c => { statusCounts[c.status] = (statusCounts[c.status] || 0) + 1; });
+  allCases.forEach(c => { statusCounts[c.status] = (statusCounts[c.status] || 0) + 1; });
   const needCounts: Record<string, number> = {};
   leads.forEach(l => l.needTypes.forEach(n => { needCounts[n] = (needCounts[n] || 0) + 1; }));
   const topNeed = Object.entries(needCounts).sort((a, b) => b[1] - a[1])[0];
+  const activeCases = (statusCounts['interviewing'] || 0) + (statusCounts['scheduled'] || 0) + (statusCounts['pending_review'] || 0);
+
+  // Client-side search filtering
+  const displayCases = searchQuery.trim()
+    ? cases.filter(c => {
+        const q = searchQuery.trim().toLowerCase();
+        return (c.lead?.company || '').toLowerCase().includes(q)
+          || (c.lead?.contactName || '').toLowerCase().includes(q)
+          || (c.lead?.email || '').toLowerCase().includes(q)
+          || c.title.toLowerCase().includes(q);
+      })
+    : cases;
 
   return (
     <div className="dashboard">
@@ -127,14 +147,15 @@ export function DashboardPage() {
         <div className="stat-card">
           <div className="stat-label">總報名數</div>
           <div className="stat-value">{totalLeads}</div>
+          {todayLeads > 0 && <div className="stat-sub">今日 +{todayLeads}</div>}
         </div>
         <div className="stat-card">
-          <div className="stat-label">今日報名</div>
-          <div className="stat-value">{todayLeads}</div>
+          <div className="stat-label">進行中案件</div>
+          <div className="stat-value">{activeCases}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">案件總數</div>
-          <div className="stat-value">{pagination.total}</div>
+          <div className="stat-value">{allCases.length}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">最常見需求</div>
@@ -142,9 +163,39 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Status Distribution */}
+      <div className="status-distribution">
+        {Object.entries(STATUS_LABELS).map(([key, label]) => {
+          const count = statusCounts[key] || 0;
+          if (count === 0) return null;
+          return (
+            <button
+              key={key}
+              className={`status-dist-item ${statusFilter === key ? 'active' : ''}`}
+              onClick={() => handleStatusFilter(statusFilter === key ? '' : key)}
+            >
+              <span className="status-dist-dot" style={{ background: STATUS_COLORS[key] }} />
+              <span className="status-dist-label">{label}</span>
+              <span className="status-dist-count">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="table-section">
         <div className="table-toolbar">
           <h2>案件列表</h2>
+          <div className="table-toolbar-right">
+            <input
+              className="search-input"
+              type="text"
+              placeholder="搜尋公司 / 聯絡人..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="table-toolbar">
           <div className="status-filters">
             <button className={`filter-chip ${statusFilter === '' ? 'active' : ''}`} onClick={() => handleStatusFilter('')}>全部</button>
             {Object.entries(STATUS_LABELS).map(([key, label]) => (
@@ -157,8 +208,8 @@ export function DashboardPage() {
 
         {loading ? (
           <div className="table-loading">載入中...</div>
-        ) : cases.length === 0 ? (
-          <div className="table-empty">目前沒有案件</div>
+        ) : displayCases.length === 0 ? (
+          <div className="table-empty">{searchQuery ? '沒有符合的搜尋結果' : '目前沒有案件'}</div>
         ) : (
           <>
             <div className="table-scroll">
@@ -174,7 +225,7 @@ export function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cases.map((c, i) => (
+                  {displayCases.map((c, i) => (
                     <tr key={c.id} onClick={() => navigate(`/admin/cases/${c.id}`)} className="clickable-row">
                       <td>{(pagination.page - 1) * pagination.limit + i + 1}</td>
                       <td className="cell-company">{c.lead?.company || c.title}</td>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth-context';
+import { Markdown } from '../components/Markdown';
 
 interface Lead {
   id: number;
@@ -47,6 +48,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_OPTIONS = ['new', 'scheduled', 'interviewing', 'pending_review', 'prd_draft', 'prd_locked', 'mvp', 'closed'];
 
+const PRD_LABELS: Record<string, string> = {
+  background: '背景與目標', users: '使用者與情境', scope: '需求範圍',
+  asIs: '現況流程', toBe: '目標流程', userStories: '功能需求',
+  acceptance: '驗收標準', dataModel: '資料與欄位', permissions: '權限與角色',
+  nonFunctional: '非功能需求', kpi: '成功指標', risks: '風險與依賴',
+  mvpScope: 'MVP 切分建議',
+};
+
 export function CaseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { authFetch, token } = useAuth();
@@ -55,6 +64,11 @@ export function CaseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [locking, setLocking] = useState(false);
+  const [prdSections, setPrdSections] = useState<Record<string, string>>({});
+  const [prdCompleteness, setPrdCompleteness] = useState(0);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [savingPrd, setSavingPrd] = useState(false);
 
   useEffect(() => {
     loadCase();
@@ -63,13 +77,44 @@ export function CaseDetailPage() {
   async function loadCase() {
     setLoading(true);
     try {
-      const res = await authFetch(`/api/cases/${id}`);
-      const data = await res.json();
+      const [caseRes, prdRes] = await Promise.all([
+        authFetch(`/api/cases/${id}`),
+        authFetch(`/api/cases/${id}/prd`),
+      ]);
+      const data = await caseRes.json();
       if (data.success) setCaseData(data.data);
+      const prdData = await prdRes.json();
+      if (prdData.success && prdData.data?.content) {
+        setPrdSections(prdData.data.content.sections || {});
+        setPrdCompleteness(prdData.data.content.metadata?.completeness || 0);
+      }
     } catch (err) {
       console.error('Failed to load case:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function savePrdSection(sectionKey: string, content: string) {
+    setSavingPrd(true);
+    try {
+      const res = await authFetch(`/api/cases/${id}/prd/draft`, {
+        method: 'PATCH',
+        body: JSON.stringify({ sectionKey, content }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPrdSections(prev => ({ ...prev, [sectionKey]: content }));
+        setEditingSection(null);
+        setEditContent('');
+        await loadCase();
+      } else {
+        alert(data.message || '儲存失敗');
+      }
+    } catch (err) {
+      console.error('Failed to save PRD section:', err);
+    } finally {
+      setSavingPrd(false);
     }
   }
 
@@ -105,6 +150,21 @@ export function CaseDetailPage() {
       console.error('Failed to lock PRD:', err);
     } finally {
       setLocking(false);
+    }
+  }
+
+  async function deleteCase() {
+    if (!confirm('確定要關閉此案件嗎？')) return;
+    try {
+      const res = await authFetch(`/api/cases/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        navigate('/admin');
+      } else {
+        alert(data.message || '刪除失敗');
+      }
+    } catch (err) {
+      console.error('Failed to delete case:', err);
     }
   }
 
@@ -150,6 +210,9 @@ export function CaseDetailPage() {
           >
             開始訪談
           </button>
+          {caseData.status !== 'closed' && (
+            <button className="btn-delete-case" onClick={deleteCase}>關閉案件</button>
+          )}
           <select
             value={caseData.status}
             onChange={e => updateStatus(e.target.value)}
@@ -223,9 +286,12 @@ export function CaseDetailPage() {
           ) : (
             <ul className="session-list">
               {caseData.sessions.map(s => (
-                <li key={s.id}>
-                  Session #{s.id} — {new Date(s.startedAt).toLocaleString('zh-TW')}
-                  {s.durationSeconds != null && <span className="session-duration"> ({Math.round(s.durationSeconds / 60)} 分鐘)</span>}
+                <li key={s.id} className="session-item clickable-row" onClick={() => navigate(`/admin/sessions/${s.id}/transcript`)}>
+                  <span>Session #{s.id} — {new Date(s.startedAt).toLocaleString('zh-TW')}</span>
+                  <span className="session-right">
+                    {s.durationSeconds != null && <span className="session-duration">{Math.round(s.durationSeconds / 60)} 分鐘</span>}
+                    <span className="session-view-link">查看逐字稿 →</span>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -267,6 +333,62 @@ export function CaseDetailPage() {
           )}
         </div>
       </div>
+
+      {/* PRD Content Editor */}
+      {Object.keys(prdSections).length > 0 && (
+        <div className="prd-editor-section">
+          <div className="prd-editor-header">
+            <h2>PRD 內容</h2>
+            <span className="completeness-badge">完成度 {prdCompleteness}%</span>
+          </div>
+          <div className="prd-editor-grid">
+            {Object.entries(PRD_LABELS).map(([key, label]) => (
+              <div key={key} className={`prd-edit-card ${prdSections[key] ? 'filled' : 'empty'}`}>
+                <div className="prd-edit-card-header">
+                  <h4>{label} {prdSections[key] ? '✓' : ''}</h4>
+                  {prdSections[key] && !editingSection && hasUnlockedDraft && (
+                    <button
+                      className="btn-edit-sm"
+                      onClick={() => { setEditingSection(key); setEditContent(prdSections[key]); }}
+                    >
+                      編輯
+                    </button>
+                  )}
+                </div>
+                {editingSection === key ? (
+                  <div className="prd-edit-area">
+                    <textarea
+                      value={editContent}
+                      onChange={e => setEditContent(e.target.value)}
+                      rows={8}
+                      className="prd-edit-textarea"
+                    />
+                    <div className="prd-edit-actions">
+                      <button
+                        className="btn-save-sm"
+                        onClick={() => savePrdSection(key, editContent)}
+                        disabled={savingPrd}
+                      >
+                        {savingPrd ? '儲存中...' : '儲存'}
+                      </button>
+                      <button
+                        className="btn-cancel-sm"
+                        onClick={() => { setEditingSection(null); setEditContent(''); }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : prdSections[key] ? (
+                  <Markdown content={prdSections[key]} className="prd-edit-content" />
+                ) : (
+                  <p className="prd-edit-placeholder">尚未填入</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

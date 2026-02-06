@@ -133,4 +133,31 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/cases/:id — soft delete (set status to 'closed')
+router.delete('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ success: false, message: '無效的案件 ID' });
+      return;
+    }
+
+    const [updated] = await db
+      .update(cases)
+      .set({ status: 'closed', completedAt: new Date() })
+      .where(eq(cases.id, id))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ success: false, message: '找不到該案件' });
+      return;
+    }
+
+    res.json({ success: true, message: '案件已關閉' });
+  } catch (err) {
+    console.error('Delete case error:', err);
+    res.status(500).json({ success: false, message: '伺服器錯誤' });
+  }
+});
+
 export default router;

@@ -6,6 +6,8 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { InterviewPage } from './pages/InterviewPage';
+import { TranscriptPage } from './pages/TranscriptPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 // Error Boundary
 class ErrorBoundary extends React.Component<
@@ -63,6 +65,8 @@ function AdminLayout() {
             <Route index element={<DashboardPage />} />
             <Route path="cases/:id" element={<CaseDetailPage />} />
             <Route path="cases/:caseId/interview" element={<InterviewPage />} />
+            <Route path="sessions/:sessionId/transcript" element={<TranscriptPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>
