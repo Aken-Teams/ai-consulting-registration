@@ -97,6 +97,12 @@ export function CaseDetailPage() {
       <div className="case-detail-header">
         <h1>{caseData.title}</h1>
         <div className="case-detail-actions">
+          <button
+            className="btn-start-interview"
+            onClick={() => navigate(`/admin/cases/${id}/interview`)}
+          >
+            開始訪談
+          </button>
           <select
             value={caseData.status}
             onChange={e => updateStatus(e.target.value)}
@@ -146,7 +152,7 @@ export function CaseDetailPage() {
 
           <h3 style={{ marginTop: 24 }}>訪談記錄 ({caseData.sessions.length})</h3>
           {caseData.sessions.length === 0 ? (
-            <p className="empty-hint">尚無訪談記錄，Phase 3 將啟用訪談工作台</p>
+            <p className="empty-hint">尚無訪談記錄</p>
           ) : (
             <ul className="session-list">
               {caseData.sessions.map(s => (

@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
+import { InterviewPage } from './pages/InterviewPage';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -22,6 +23,7 @@ function AdminLayout() {
           <Routes>
             <Route index element={<DashboardPage />} />
             <Route path="cases/:id" element={<CaseDetailPage />} />
+            <Route path="cases/:caseId/interview" element={<InterviewPage />} />
           </Routes>
         </main>
       </div>
