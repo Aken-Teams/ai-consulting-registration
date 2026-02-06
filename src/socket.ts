@@ -2,14 +2,25 @@ import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type OpenAI from 'openai';
 import { verifyToken } from './lib/auth.js';
 import { runAgent, type AgentContext } from './agent/agent.js';
+import { transcribeAudio, sttAvailable } from './lib/stt.js';
 import { db } from './db/index.js';
-import { leads, cases, sessions, transcripts } from './db/schema.js';
+import { leads, cases, sessions, transcripts, artifacts } from './db/schema.js';
 import { eq } from 'drizzle-orm';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ARTIFACTS_DIR = join(__dirname, '..', 'data', 'artifacts');
 
 // In-memory conversation history per session
 const sessionHistories = new Map<number, OpenAI.ChatCompletionMessageParam[]>();
 // Sequence counter per session
 const sessionSeqCounters = new Map<number, number>();
+// Audio buffer accumulator per session (for chunk-based recording)
+const sessionAudioBuffers = new Map<number, Buffer[]>();
+// Full recording accumulator per session
+const sessionRecordings = new Map<number, Buffer[]>();
 
 export function setupSocketIO(io: SocketIOServer) {
   io.on('connection', (socket: Socket) => {
@@ -45,7 +56,7 @@ export function setupSocketIO(io: SocketIOServer) {
         sessionSeqCounters.set(data.sessionId, existing.length);
       }
 
-      socket.emit('sessionJoined', { sessionId: data.sessionId });
+      socket.emit('sessionJoined', { sessionId: data.sessionId, sttAvailable });
     });
 
     // Chat message from consultant
@@ -55,114 +66,206 @@ export function setupSocketIO(io: SocketIOServer) {
         return;
       }
 
+      await handleUserMessage(io, currentSessionId, currentCaseId, data.message);
+    });
+
+    // Audio chunk from browser MediaRecorder
+    socket.on('audioChunk', async (data: { chunk: ArrayBuffer }) => {
+      if (!currentSessionId || !currentCaseId) {
+        socket.emit('error', { message: '未加入訪談' });
+        return;
+      }
+
+      const buf = Buffer.from(data.chunk);
+
+      // Accumulate for STT processing
+      if (!sessionAudioBuffers.has(currentSessionId)) {
+        sessionAudioBuffers.set(currentSessionId, []);
+      }
+      sessionAudioBuffers.get(currentSessionId)!.push(buf);
+
+      // Accumulate for full recording save
+      if (!sessionRecordings.has(currentSessionId)) {
+        sessionRecordings.set(currentSessionId, []);
+      }
+      sessionRecordings.get(currentSessionId)!.push(buf);
+    });
+
+    // Audio recording stopped — process accumulated audio
+    socket.on('audioStop', async () => {
+      if (!currentSessionId || !currentCaseId) return;
+
       const room = `session:${currentSessionId}`;
-      const seq = sessionSeqCounters.get(currentSessionId) || 0;
+      const chunks = sessionAudioBuffers.get(currentSessionId) || [];
+      sessionAudioBuffers.set(currentSessionId, []);
 
-      // Save user transcript
-      await db.insert(transcripts).values({
-        sessionId: currentSessionId,
-        speaker: 'consultant',
-        content: data.message,
-        startMs: 0,
-        endMs: 0,
-        sequenceNumber: seq,
+      if (chunks.length === 0) return;
+
+      const audioBuffer = Buffer.concat(chunks);
+      io.to(room).emit('sttProcessing', true);
+
+      try {
+        const text = await transcribeAudio(audioBuffer);
+        io.to(room).emit('sttProcessing', false);
+
+        if (text) {
+          // Emit the transcription to the client for review/edit
+          io.to(room).emit('sttResult', { text });
+        } else {
+          io.to(room).emit('sttResult', { text: null, error: '無法辨識語音' });
+        }
+      } catch (err) {
+        console.error('[STT] Processing error:', err);
+        io.to(room).emit('sttProcessing', false);
+        io.to(room).emit('sttResult', { text: null, error: '語音轉文字失敗' });
+      }
+    });
+
+    // Send transcribed text as a chat message (user confirms)
+    socket.on('sendTranscription', async (data: { text: string }) => {
+      if (!currentSessionId || !currentCaseId) {
+        socket.emit('error', { message: '未加入訪談' });
+        return;
+      }
+
+      await handleUserMessage(io, currentSessionId, currentCaseId, data.text);
+    });
+
+    socket.on('disconnect', async () => {
+      console.log(`[Socket] Client disconnected: ${socket.id}`);
+
+      // Save recording if exists
+      if (currentSessionId && currentCaseId) {
+        const recording = sessionRecordings.get(currentSessionId);
+        if (recording && recording.length > 0) {
+          try {
+            await mkdir(ARTIFACTS_DIR, { recursive: true });
+            const filename = `recording_session_${currentSessionId}_${Date.now()}.webm`;
+            const storagePath = join(ARTIFACTS_DIR, filename);
+            const fullRecording = Buffer.concat(recording);
+            await writeFile(storagePath, fullRecording);
+
+            await db.insert(artifacts).values({
+              caseId: currentCaseId,
+              filename,
+              mimeType: 'audio/webm',
+              sizeBytes: fullRecording.length,
+              storagePath,
+            });
+
+            console.log(`[Recording] Saved ${fullRecording.length} bytes for session ${currentSessionId}`);
+          } catch (err) {
+            console.error('[Recording] Save error:', err);
+          }
+        }
+
+        // Cleanup
+        sessionAudioBuffers.delete(currentSessionId);
+        sessionRecordings.delete(currentSessionId);
+      }
+    });
+  });
+
+  /** Shared handler for user messages (typed or transcribed) */
+  async function handleUserMessage(io: SocketIOServer, sessionId: number, caseId: number, message: string) {
+    const room = `session:${sessionId}`;
+    const seq = sessionSeqCounters.get(sessionId) || 0;
+
+    // Save user transcript
+    await db.insert(transcripts).values({
+      sessionId,
+      speaker: 'consultant',
+      content: message,
+      startMs: 0,
+      endMs: 0,
+      sequenceNumber: seq,
+    });
+    sessionSeqCounters.set(sessionId, seq + 1);
+
+    // Broadcast user message to room
+    io.to(room).emit('message', {
+      role: 'user',
+      content: message,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Build lead context
+    const [caseRow] = await db.select().from(cases).where(eq(cases.id, caseId)).limit(1);
+    let leadContext = '';
+    if (caseRow) {
+      const [lead] = await db.select().from(leads).where(eq(leads.id, caseRow.leadId)).limit(1);
+      if (lead) {
+        leadContext = [
+          `公司: ${lead.company}`,
+          `聯絡人: ${lead.contactName}${lead.title ? ` (${lead.title})` : ''}`,
+          `規模: ${lead.companySize}`,
+          lead.industry ? `產業: ${lead.industry}` : '',
+          `需求類型: ${lead.needTypes.join('、')}`,
+          lead.description ? `需求描述: ${lead.description}` : '',
+          lead.painPoints ? `痛點: ${lead.painPoints}` : '',
+          lead.expectedOutcome ? `期望成果: ${lead.expectedOutcome}` : '',
+          lead.existingTools ? `現有工具: ${lead.existingTools}` : '',
+        ].filter(Boolean).join('\n');
+      }
+    }
+
+    const ctx: AgentContext = { caseId, sessionId, leadContext };
+    const history = sessionHistories.get(sessionId) || [];
+
+    // Signal agent is typing
+    io.to(room).emit('agentTyping', true);
+
+    try {
+      let streamedContent = '';
+      const result = await runAgent(ctx, history, message, (chunk) => {
+        streamedContent += chunk;
+        io.to(room).emit('agentStream', { chunk });
       });
-      sessionSeqCounters.set(currentSessionId, seq + 1);
 
-      // Broadcast user message to room
+      io.to(room).emit('agentTyping', false);
+
+      // Emit complete agent message
       io.to(room).emit('message', {
-        role: 'user',
-        content: data.message,
+        role: 'agent',
+        content: result.reply,
         timestamp: new Date().toISOString(),
       });
 
-      // Build lead context
-      const [caseRow] = await db.select().from(cases).where(eq(cases.id, currentCaseId)).limit(1);
-      let leadContext = '';
-      if (caseRow) {
-        const [lead] = await db.select().from(leads).where(eq(leads.id, caseRow.leadId)).limit(1);
-        if (lead) {
-          leadContext = [
-            `公司: ${lead.company}`,
-            `聯絡人: ${lead.contactName}${lead.title ? ` (${lead.title})` : ''}`,
-            `規模: ${lead.companySize}`,
-            lead.industry ? `產業: ${lead.industry}` : '',
-            `需求類型: ${lead.needTypes.join('、')}`,
-            lead.description ? `需求描述: ${lead.description}` : '',
-            lead.painPoints ? `痛點: ${lead.painPoints}` : '',
-            lead.expectedOutcome ? `期望成果: ${lead.expectedOutcome}` : '',
-            lead.existingTools ? `現有工具: ${lead.existingTools}` : '',
-          ].filter(Boolean).join('\n');
-        }
+      // Save agent transcript
+      const agentSeq = sessionSeqCounters.get(sessionId) || 0;
+      await db.insert(transcripts).values({
+        sessionId,
+        speaker: 'agent',
+        content: result.reply,
+        startMs: 0,
+        endMs: 0,
+        sequenceNumber: agentSeq,
+      });
+      sessionSeqCounters.set(sessionId, agentSeq + 1);
+
+      // Update conversation history
+      history.push({ role: 'user', content: message });
+      history.push({ role: 'assistant', content: result.reply });
+      sessionHistories.set(sessionId, history);
+
+      // Notify PRD update
+      if (result.prdUpdated) {
+        io.to(room).emit('prdUpdated', { caseId });
       }
 
-      const ctx: AgentContext = {
-        caseId: currentCaseId,
-        sessionId: currentSessionId,
-        leadContext,
-      };
-
-      const history = sessionHistories.get(currentSessionId) || [];
-
-      // Signal agent is typing
-      io.to(room).emit('agentTyping', true);
-
-      try {
-        let streamedContent = '';
-        const result = await runAgent(ctx, history, data.message, (chunk) => {
-          streamedContent += chunk;
-          io.to(room).emit('agentStream', { chunk });
-        });
-
-        io.to(room).emit('agentTyping', false);
-
-        // Emit complete agent message
-        io.to(room).emit('message', {
-          role: 'agent',
-          content: result.reply,
-          timestamp: new Date().toISOString(),
-        });
-
-        // Save agent transcript
-        const agentSeq = sessionSeqCounters.get(currentSessionId) || 0;
-        await db.insert(transcripts).values({
-          sessionId: currentSessionId,
-          speaker: 'agent',
-          content: result.reply,
-          startMs: 0,
-          endMs: 0,
-          sequenceNumber: agentSeq,
-        });
-        sessionSeqCounters.set(currentSessionId, agentSeq + 1);
-
-        // Update conversation history
-        history.push({ role: 'user', content: data.message });
-        history.push({ role: 'assistant', content: result.reply });
-        sessionHistories.set(currentSessionId, history);
-
-        // Notify PRD update
-        if (result.prdUpdated) {
-          io.to(room).emit('prdUpdated', { caseId: currentCaseId });
-        }
-
-        // Notify summary
-        if (result.summary) {
-          io.to(room).emit('agentSummary', result.summary);
-        }
-
-        // Notify tool calls
-        if (result.toolCalls.length > 0) {
-          io.to(room).emit('toolCalls', result.toolCalls);
-        }
-      } catch (err) {
-        console.error('[Agent] Error:', err);
-        io.to(room).emit('agentTyping', false);
-        io.to(room).emit('error', { message: 'Agent 處理錯誤，請重試' });
+      // Notify summary
+      if (result.summary) {
+        io.to(room).emit('agentSummary', result.summary);
       }
-    });
 
-    socket.on('disconnect', () => {
-      console.log(`[Socket] Client disconnected: ${socket.id}`);
-    });
-  });
+      // Notify tool calls
+      if (result.toolCalls.length > 0) {
+        io.to(room).emit('toolCalls', result.toolCalls);
+      }
+    } catch (err) {
+      console.error('[Agent] Error:', err);
+      io.to(room).emit('agentTyping', false);
+      io.to(room).emit('error', { message: 'Agent 處理錯誤，請重試' });
+    }
+  }
 }

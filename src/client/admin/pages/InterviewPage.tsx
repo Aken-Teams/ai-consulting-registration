@@ -45,9 +45,14 @@ export function InterviewPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [leadInfo, setLeadInfo] = useState<any>(null);
   const [connected, setConnected] = useState(false);
+  const [sttEnabled, setSttEnabled] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [sttProcessing, setSttProcessing] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -96,7 +101,10 @@ export function InterviewPage() {
       });
     });
 
-    s.on('sessionJoined', () => setConnected(true));
+    s.on('sessionJoined', (data: { sessionId: number; sttAvailable: boolean }) => {
+      setConnected(true);
+      setSttEnabled(data.sttAvailable);
+    });
 
     s.on('message', (msg: Message) => {
       setStreamingText('');
@@ -113,13 +121,24 @@ export function InterviewPage() {
     });
 
     s.on('prdUpdated', () => {
-      // Reload PRD
       authFetch(`/api/cases/${caseId}/prd`).then(r => r.json()).then(d => {
         if (d.success && d.data) setPrd(d.data);
       });
     });
 
     s.on('agentSummary', (data: Summary) => setSummary(data));
+
+    s.on('sttProcessing', (processing: boolean) => setSttProcessing(processing));
+
+    s.on('sttResult', (data: { text: string | null; error?: string }) => {
+      setSttProcessing(false);
+      if (data.text) {
+        setInput(prev => prev ? prev + ' ' + data.text : data.text);
+        inputRef.current?.focus();
+      } else if (data.error) {
+        console.warn('[STT]', data.error);
+      }
+    });
 
     s.on('error', (data: { message: string }) => {
       console.error('[Socket] Error:', data.message);
@@ -143,8 +162,51 @@ export function InterviewPage() {
     }
   };
 
+  const startRecording = useCallback(async () => {
+    if (!socket || recording) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0 && socket) {
+          e.data.arrayBuffer().then(buf => socket.emit('audioChunk', { chunk: buf }));
+        }
+      };
+
+      recorder.start(500); // send chunks every 500ms
+      setRecording(true);
+    } catch (err) {
+      console.error('[Mic] Access denied:', err);
+    }
+  }, [socket, recording]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      mediaStreamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    setRecording(false);
+    socket?.emit('audioStop');
+  }, [socket]);
+
+  const toggleRecording = useCallback(() => {
+    if (recording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [recording, startRecording, stopRecording]);
+
   const endSession = async () => {
     if (sessionId) {
+      if (recording) stopRecording();
       await authFetch(`/api/sessions/${sessionId}`, { method: 'PATCH' });
       socket?.disconnect();
       navigate(`/admin/cases/${caseId}`);
@@ -236,13 +298,26 @@ export function InterviewPage() {
             )}
             <div ref={chatEndRef} />
           </div>
+          {sttProcessing && (
+            <div className="stt-processing-bar">語音辨識中...</div>
+          )}
           <div className="chat-input-area">
+            {sttEnabled && (
+              <button
+                className={`btn-mic ${recording ? 'recording' : ''}`}
+                onClick={toggleRecording}
+                disabled={!connected || agentTyping || sttProcessing}
+                title={recording ? '停止錄音' : '開始語音輸入'}
+              >
+                {recording ? '■' : '🎤'}
+              </button>
+            )}
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="輸入訊息... (Enter 送出, Shift+Enter 換行)"
+              placeholder={sttEnabled ? '輸入訊息或點擊麥克風語音輸入...' : '輸入訊息... (Enter 送出, Shift+Enter 換行)'}
               rows={2}
               disabled={!connected || agentTyping}
             />
