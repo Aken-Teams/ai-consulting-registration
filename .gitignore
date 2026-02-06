@@ -1,6 +1,8 @@
 node_modules/
 dist/
 data/registrations.json
+.env
+drizzle/
 *.map
 bun.lockb
 bun.lock

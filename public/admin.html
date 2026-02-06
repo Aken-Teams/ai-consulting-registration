@@ -372,7 +372,7 @@
         document.getElementById('stat-total').textContent = data.length;
 
         const today = new Date().toISOString().slice(0, 10);
-        const todayCount = data.filter(d => d.submittedAt.slice(0, 10) === today).length;
+        const todayCount = data.filter(d => (d.submittedAt || d.createdAt).slice(0, 10) === today).length;
         document.getElementById('stat-today').textContent = todayCount;
 
         // Top need
@@ -403,7 +403,7 @@
           tr.style.cursor = 'pointer';
           tr.onclick = () => showDetail(d);
 
-          const time = new Date(d.submittedAt);
+          const time = new Date((d.submittedAt || d.createdAt));
           const timeStr = time.toLocaleDateString('zh-TW') + ' ' + time.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
 
           tr.innerHTML =
@@ -432,7 +432,7 @@
     }
 
     function showDetail(d) {
-      const time = new Date(d.submittedAt);
+      const time = new Date((d.submittedAt || d.createdAt));
       const timeStr = time.toLocaleDateString('zh-TW') + ' ' + time.toLocaleTimeString('zh-TW');
       const fields = [
         ['公司', d.company],
