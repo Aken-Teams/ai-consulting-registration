@@ -4,6 +4,8 @@ import { prdVersions, cases, leads, artifacts } from '../db/schema.js';
 import { eq, desc, and } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { buildPrdMarkdown, exportPrdToPdf } from '../lib/prd-export.js';
+import { sendEmail } from '../lib/email.js';
+import { prdLocked } from '../lib/email-templates.js';
 import type { JwtPayload } from '../lib/auth.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -143,6 +145,22 @@ router.post('/:caseId/prd/lock', async (req, res) => {
 
     // Update case status
     await db.update(cases).set({ status: 'prd_locked' }).where(eq(cases.id, caseId));
+
+    // Send PRD lock notification email
+    const [caseRow] = await db.select().from(cases).where(eq(cases.id, caseId)).limit(1);
+    if (caseRow) {
+      const [lead] = await db.select().from(leads).where(eq(leads.id, caseRow.leadId)).limit(1);
+      if (lead) {
+        const completeness = (draft.content as any)?.metadata?.completeness || 0;
+        const emailData = prdLocked({
+          contactName: lead.contactName,
+          company: lead.company,
+          versionNumber: locked.versionNumber,
+          completeness,
+        });
+        sendEmail({ to: lead.email, ...emailData }).catch(() => {});
+      }
+    }
 
     res.json({ success: true, data: locked });
   } catch (err) {

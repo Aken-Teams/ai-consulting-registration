@@ -3,6 +3,8 @@ import { db } from '../db/index.js';
 import { leads, cases } from '../db/schema.js';
 import { desc } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
+import { sendEmail } from '../lib/email.js';
+import { registrationConfirmation } from '../lib/email-templates.js';
 
 const router = Router();
 
@@ -17,7 +19,8 @@ function validatePhone(phone: string): boolean {
 // POST /api/register — public
 router.post('/', async (req, res) => {
   try {
-    const { company, contactName, title, email, phone, companySize, needTypes, description } = req.body;
+    const { company, contactName, title, email, phone, companySize, needTypes, description,
+      industry, painPoints, expectedOutcome, existingTools, preferredTimeslots } = req.body;
 
     const errors: string[] = [];
     if (!company || typeof company !== 'string' || company.trim().length < 1) {
@@ -53,6 +56,11 @@ router.post('/', async (req, res) => {
       companySize,
       needTypes,
       description: (description || '').trim() || null,
+      industry: (industry || '').trim() || null,
+      painPoints: (painPoints || '').trim() || null,
+      expectedOutcome: (expectedOutcome || '').trim() || null,
+      existingTools: (existingTools || '').trim() || null,
+      preferredTimeslots: Array.isArray(preferredTimeslots) && preferredTimeslots.length > 0 ? preferredTimeslots : null,
     }).returning();
 
     // Auto-create a case for this lead
@@ -61,6 +69,14 @@ router.post('/', async (req, res) => {
       status: 'new',
       title: `${lead.company} — AI 輔能諮詢`,
     });
+
+    // Send confirmation email (async, don't block response)
+    const emailData = registrationConfirmation({
+      contactName: lead.contactName,
+      company: lead.company,
+      needTypes: lead.needTypes,
+    });
+    sendEmail({ to: lead.email, ...emailData }).catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -73,9 +89,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/registrations or /api/registrations/list
-// TODO: protect with requireAuth after admin SPA has login flow
-router.get('/', async (_req, res) => {
+// GET /api/registrations — protected
+router.get('/', requireAuth, async (_req, res) => {
   try {
     const list = await db
       .select()

@@ -12,6 +12,11 @@ interface Lead {
   companySize: string;
   needTypes: string[];
   description: string | null;
+  industry: string | null;
+  painPoints: string | null;
+  expectedOutcome: string | null;
+  existingTools: string | null;
+  preferredTimeslots: string[] | null;
   createdAt: string;
 }
 
@@ -168,16 +173,36 @@ export function CaseDetailPage() {
             <div className="detail-field"><span className="field-label">Email</span><span>{lead.email}</span></div>
             <div className="detail-field"><span className="field-label">電話</span><span>{lead.phone}</span></div>
             <div className="detail-field"><span className="field-label">公司規模</span><span>{lead.companySize}</span></div>
+            {lead.industry && <div className="detail-field"><span className="field-label">產業別</span><span>{lead.industry}</span></div>}
+            {lead.existingTools && <div className="detail-field"><span className="field-label">現有工具</span><span>{lead.existingTools}</span></div>}
             <div className="detail-field">
               <span className="field-label">需求類型</span>
               <div className="need-tags">
                 {lead.needTypes.map(n => <span key={n} className="need-tag">{n}</span>)}
               </div>
             </div>
+            {lead.painPoints && (
+              <div className="detail-field detail-field-full">
+                <span className="field-label">痛點</span>
+                <p className="field-description">{lead.painPoints}</p>
+              </div>
+            )}
+            {lead.expectedOutcome && (
+              <div className="detail-field detail-field-full">
+                <span className="field-label">期望成果</span>
+                <p className="field-description">{lead.expectedOutcome}</p>
+              </div>
+            )}
             {lead.description && (
               <div className="detail-field detail-field-full">
-                <span className="field-label">需求描述</span>
+                <span className="field-label">補充說明</span>
                 <p className="field-description">{lead.description}</p>
+              </div>
+            )}
+            {lead.preferredTimeslots && lead.preferredTimeslots.length > 0 && (
+              <div className="detail-field">
+                <span className="field-label">偏好時段</span>
+                <span>{lead.preferredTimeslots.join('、')}</span>
               </div>
             )}
           </div>

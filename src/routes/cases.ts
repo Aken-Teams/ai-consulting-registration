@@ -3,6 +3,8 @@ import { db } from '../db/index.js';
 import { cases, leads } from '../db/schema.js';
 import { eq, desc, sql, and } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
+import { sendEmail } from '../lib/email.js';
+import { interviewScheduled } from '../lib/email-templates.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -106,6 +108,19 @@ router.patch('/:id', async (req, res) => {
     if (!updated) {
       res.status(404).json({ success: false, message: '找不到該案件' });
       return;
+    }
+
+    // Send schedule notification if scheduledAt was set
+    if (scheduledAt && status === 'scheduled') {
+      const [lead] = await db.select().from(leads).where(eq(leads.id, updated.leadId)).limit(1);
+      if (lead) {
+        const emailData = interviewScheduled({
+          contactName: lead.contactName,
+          company: lead.company,
+          scheduledAt,
+        });
+        sendEmail({ to: lead.email, ...emailData }).catch(() => {});
+      }
     }
 
     res.json({ success: true, data: updated });

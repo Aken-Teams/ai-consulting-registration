@@ -174,8 +174,12 @@ export function InterviewPage() {
               <div className="info-item"><span>公司</span>{leadInfo.company}</div>
               <div className="info-item"><span>聯絡人</span>{leadInfo.contactName}</div>
               <div className="info-item"><span>規模</span>{leadInfo.companySize}</div>
+              {leadInfo.industry && <div className="info-item"><span>產業</span>{leadInfo.industry}</div>}
               <div className="info-item"><span>需求</span>{leadInfo.needTypes?.join('、')}</div>
-              {leadInfo.description && <div className="info-item info-desc"><span>描述</span>{leadInfo.description}</div>}
+              {leadInfo.painPoints && <div className="info-item info-desc"><span>痛點</span>{leadInfo.painPoints}</div>}
+              {leadInfo.expectedOutcome && <div className="info-item info-desc"><span>目標</span>{leadInfo.expectedOutcome}</div>}
+              {leadInfo.existingTools && <div className="info-item"><span>工具</span>{leadInfo.existingTools}</div>}
+              {leadInfo.description && <div className="info-item info-desc"><span>備註</span>{leadInfo.description}</div>}
             </div>
           )}
           {summary && (

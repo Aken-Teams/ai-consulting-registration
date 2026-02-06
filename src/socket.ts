@@ -86,8 +86,12 @@ export function setupSocketIO(io: SocketIOServer) {
             `公司: ${lead.company}`,
             `聯絡人: ${lead.contactName}${lead.title ? ` (${lead.title})` : ''}`,
             `規模: ${lead.companySize}`,
+            lead.industry ? `產業: ${lead.industry}` : '',
             `需求類型: ${lead.needTypes.join('、')}`,
             lead.description ? `需求描述: ${lead.description}` : '',
+            lead.painPoints ? `痛點: ${lead.painPoints}` : '',
+            lead.expectedOutcome ? `期望成果: ${lead.expectedOutcome}` : '',
+            lead.existingTools ? `現有工具: ${lead.existingTools}` : '',
           ].filter(Boolean).join('\n');
         }
       }

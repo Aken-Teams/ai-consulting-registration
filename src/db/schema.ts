@@ -46,6 +46,11 @@ export const leads = pgTable('leads', {
   companySize: varchar('company_size', { length: 50 }).notNull(),
   needTypes: jsonb('need_types').$type<string[]>().notNull(),
   description: text('description'),
+  industry: varchar('industry', { length: 100 }),
+  painPoints: text('pain_points'),
+  expectedOutcome: text('expected_outcome'),
+  existingTools: text('existing_tools'),
+  preferredTimeslots: jsonb('preferred_timeslots').$type<string[]>(),
   ...timestamps,
 });
 

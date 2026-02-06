@@ -3,6 +3,8 @@ import type { ApiResponse } from '../../shared/types';
 
 const NEED_OPTIONS = ['流程優化', '作業自動化', '系統改造', '新工具導入', '其他'];
 const SIZE_OPTIONS = ['1-10 人', '11-50 人', '51-200 人', '200 人以上'];
+const INDUSTRY_OPTIONS = ['科技業', '製造業', '金融業', '零售/電商', '醫療', '教育', '服務業', '其他'];
+const TIMESLOT_OPTIONS = ['平日上午', '平日下午', '平日晚間', '週末'];
 
 interface FormData {
   company: string;
@@ -13,6 +15,11 @@ interface FormData {
   companySize: string;
   needTypes: string[];
   description: string;
+  industry: string;
+  painPoints: string;
+  expectedOutcome: string;
+  existingTools: string;
+  preferredTimeslots: string[];
 }
 
 const emptyForm: FormData = {
@@ -24,6 +31,11 @@ const emptyForm: FormData = {
   companySize: '',
   needTypes: [],
   description: '',
+  industry: '',
+  painPoints: '',
+  expectedOutcome: '',
+  existingTools: '',
+  preferredTimeslots: [],
 };
 
 export function RegistrationForm() {
@@ -44,20 +56,16 @@ export function RegistrationForm() {
     }
   };
 
-  const toggleNeed = (need: string) => {
+  const toggleArray = (field: 'needTypes' | 'preferredTimeslots', item: string) => {
     setForm((prev) => {
-      const has = prev.needTypes.includes(need);
-      return {
-        ...prev,
-        needTypes: has
-          ? prev.needTypes.filter((n) => n !== need)
-          : [...prev.needTypes, need],
-      };
+      const arr = prev[field];
+      const has = arr.includes(item);
+      return { ...prev, [field]: has ? arr.filter((n) => n !== item) : [...arr, item] };
     });
-    if (errors.needTypes) {
+    if (errors[field]) {
       setErrors((prev) => {
         const next = { ...prev };
-        delete next.needTypes;
+        delete next[field];
         return next;
       });
     }
@@ -186,20 +194,18 @@ export function RegistrationForm() {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="companySize">公司規模 <span className="required">*</span></label>
+              <label htmlFor="industry">產業別</label>
               <select
-                id="companySize"
-                value={form.companySize}
-                onChange={(e) => set('companySize', e.target.value)}
-                className={errors.companySize ? 'error' : ''}
+                id="industry"
+                value={form.industry}
+                onChange={(e) => set('industry', e.target.value)}
                 disabled={submitting}
               >
                 <option value="">請選擇</option>
-                {SIZE_OPTIONS.map((s) => (
+                {INDUSTRY_OPTIONS.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
-              {errors.companySize && <span className="field-error">{errors.companySize}</span>}
             </div>
           </div>
 
@@ -232,6 +238,36 @@ export function RegistrationForm() {
             </div>
           </div>
 
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="companySize">公司規模 <span className="required">*</span></label>
+              <select
+                id="companySize"
+                value={form.companySize}
+                onChange={(e) => set('companySize', e.target.value)}
+                className={errors.companySize ? 'error' : ''}
+                disabled={submitting}
+              >
+                <option value="">請選擇</option>
+                {SIZE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              {errors.companySize && <span className="field-error">{errors.companySize}</span>}
+            </div>
+            <div className="form-group">
+              <label htmlFor="existingTools">現有工具/系統</label>
+              <input
+                id="existingTools"
+                type="text"
+                value={form.existingTools}
+                onChange={(e) => set('existingTools', e.target.value)}
+                placeholder="例：Excel、ERP、自建系統..."
+                disabled={submitting}
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label>需求類型 <span className="required">*</span>（可複選）</label>
             <div className="checkbox-group">
@@ -240,7 +276,7 @@ export function RegistrationForm() {
                   <input
                     type="checkbox"
                     checked={form.needTypes.includes(n)}
-                    onChange={() => toggleNeed(n)}
+                    onChange={() => toggleArray('needTypes', n)}
                     disabled={submitting}
                   />
                   <span className="checkbox-custom" />
@@ -252,15 +288,58 @@ export function RegistrationForm() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="description">需求簡述</label>
+            <label htmlFor="painPoints">想解決的痛點</label>
             <textarea
-              id="description"
-              value={form.description}
-              onChange={(e) => set('description', e.target.value)}
-              placeholder="請簡單描述您目前遇到的問題或想達成的目標，例如：希望自動化每月報表產出流程⋯⋯"
-              rows={4}
+              id="painPoints"
+              value={form.painPoints}
+              onChange={(e) => set('painPoints', e.target.value)}
+              placeholder="例：每月花 3 天手動整理報表、客戶回覆速度太慢..."
+              rows={3}
               disabled={submitting}
             />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="expectedOutcome">期望成果</label>
+              <textarea
+                id="expectedOutcome"
+                value={form.expectedOutcome}
+                onChange={(e) => set('expectedOutcome', e.target.value)}
+                placeholder="例：減少 50% 人工作業、提升回覆效率..."
+                rows={2}
+                disabled={submitting}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="description">其他補充說明</label>
+              <textarea
+                id="description"
+                value={form.description}
+                onChange={(e) => set('description', e.target.value)}
+                placeholder="任何您想補充的資訊..."
+                rows={2}
+                disabled={submitting}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>方便的訪談時段（可複選）</label>
+            <div className="checkbox-group">
+              {TIMESLOT_OPTIONS.map((t) => (
+                <label key={t} className={`checkbox-label${form.preferredTimeslots.includes(t) ? ' checked' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={form.preferredTimeslots.includes(t)}
+                    onChange={() => toggleArray('preferredTimeslots', t)}
+                    disabled={submitting}
+                  />
+                  <span className="checkbox-custom" />
+                  {t}
+                </label>
+              ))}
+            </div>
           </div>
 
           {serverError && (
