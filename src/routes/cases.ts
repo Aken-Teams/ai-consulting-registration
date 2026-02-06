@@ -5,6 +5,7 @@ import { eq, desc, sql, and } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { sendEmail } from '../lib/email.js';
 import { interviewScheduled } from '../lib/email-templates.js';
+import { updateCaseSchema } from '../lib/validators.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -86,18 +87,20 @@ router.patch('/:id', async (req, res) => {
       return;
     }
 
-    const { status, consultantId, scheduledAt, title } = req.body;
+    const result = updateCaseSchema.safeParse(req.body);
+    if (!result.success) {
+      const messages = result.error.issues.map(i => i.message);
+      res.status(400).json({ success: false, message: messages.join('；') });
+      return;
+    }
+
+    const { status, consultantId, scheduledAt, title } = result.data;
     const updates: Record<string, unknown> = {};
 
     if (status) updates.status = status;
     if (consultantId !== undefined) updates.consultantId = consultantId;
     if (scheduledAt) updates.scheduledAt = new Date(scheduledAt);
     if (title) updates.title = title;
-
-    if (Object.keys(updates).length === 0) {
-      res.status(400).json({ success: false, message: '無更新欄位' });
-      return;
-    }
 
     const [updated] = await db
       .update(cases)

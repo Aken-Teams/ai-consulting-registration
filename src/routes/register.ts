@@ -5,62 +5,36 @@ import { desc } from 'drizzle-orm';
 import { requireAuth } from '../middleware/auth.js';
 import { sendEmail } from '../lib/email.js';
 import { registrationConfirmation } from '../lib/email-templates.js';
+import { registerSchema } from '../lib/validators.js';
 
 const router = Router();
-
-function validateEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function validatePhone(phone: string): boolean {
-  return /^[\d\-+() ]{7,20}$/.test(phone);
-}
 
 // POST /api/register — public
 router.post('/', async (req, res) => {
   try {
-    const { company, contactName, title, email, phone, companySize, needTypes, description,
-      industry, painPoints, expectedOutcome, existingTools, preferredTimeslots } = req.body;
-
-    const errors: string[] = [];
-    if (!company || typeof company !== 'string' || company.trim().length < 1) {
-      errors.push('請填寫公司名稱');
-    }
-    if (!contactName || typeof contactName !== 'string' || contactName.trim().length < 1) {
-      errors.push('請填寫聯絡人姓名');
-    }
-    if (!email || typeof email !== 'string' || !validateEmail(email.trim())) {
-      errors.push('請填寫有效的 Email');
-    }
-    if (!phone || typeof phone !== 'string' || !validatePhone(phone.trim())) {
-      errors.push('請填寫有效的電話號碼');
-    }
-    if (!companySize || typeof companySize !== 'string') {
-      errors.push('請選擇公司規模');
-    }
-    if (!Array.isArray(needTypes) || needTypes.length === 0) {
-      errors.push('請至少選擇一項需求類型');
-    }
-
-    if (errors.length > 0) {
-      res.status(422).json({ success: false, message: errors.join('；') });
+    const result = registerSchema.safeParse(req.body);
+    if (!result.success) {
+      const messages = result.error.issues.map(i => i.message);
+      res.status(422).json({ success: false, message: messages.join('；') });
       return;
     }
 
+    const data = result.data;
+
     const [lead] = await db.insert(leads).values({
-      company: company.trim(),
-      contactName: contactName.trim(),
-      title: (title || '').trim() || null,
-      email: email.trim(),
-      phone: phone.trim(),
-      companySize,
-      needTypes,
-      description: (description || '').trim() || null,
-      industry: (industry || '').trim() || null,
-      painPoints: (painPoints || '').trim() || null,
-      expectedOutcome: (expectedOutcome || '').trim() || null,
-      existingTools: (existingTools || '').trim() || null,
-      preferredTimeslots: Array.isArray(preferredTimeslots) && preferredTimeslots.length > 0 ? preferredTimeslots : null,
+      company: data.company.trim(),
+      contactName: data.contactName.trim(),
+      title: data.title?.trim() || null,
+      email: data.email.trim(),
+      phone: data.phone.trim(),
+      companySize: data.companySize,
+      needTypes: data.needTypes,
+      description: data.description?.trim() || null,
+      industry: data.industry?.trim() || null,
+      painPoints: data.painPoints?.trim() || null,
+      expectedOutcome: data.expectedOutcome?.trim() || null,
+      existingTools: data.existingTools?.trim() || null,
+      preferredTimeslots: data.preferredTimeslots && data.preferredTimeslots.length > 0 ? data.preferredTimeslots : null,
     }).returning();
 
     // Auto-create a case for this lead

@@ -5,6 +5,7 @@ data/artifacts/
 .env
 drizzle/
 *.map
+*.log
 bun.lockb
 bun.lock
 .claude/

@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import { createServer } from 'node:http';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +15,8 @@ import casesRouter from './routes/cases.js';
 import sessionsRouter from './routes/sessions.js';
 import prdRouter from './routes/prd.js';
 import { setupSocketIO } from './socket.js';
+import { db } from './db/index.js';
+import { sql } from 'drizzle-orm';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -26,7 +31,34 @@ const io = new SocketIOServer(httpServer, {
 });
 setupSocketIO(io);
 
-app.use(express.json());
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false,  // Allow inline scripts for SPA
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Gzip compression
+app.use(compression());
+
+// Rate limiting — public API
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 50,
+  message: { success: false, message: '請求過於頻繁，請稍後再試' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiting — auth
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { success: false, message: '登入嘗試過於頻繁，請稍後再試' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -34,9 +66,19 @@ app.use(cookieParser());
 app.use(express.static(join(ROOT, 'public')));
 app.use('/dist', express.static(join(ROOT, 'dist')));
 
+// --- Health Check ---
+app.get('/api/health', async (_req, res) => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    res.json({ status: 'ok', db: 'connected', uptime: process.uptime() });
+  } catch {
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
+});
+
 // --- API Routes ---
-app.use('/api/auth', authRouter);
-app.use('/api/register', registerRouter);
+app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/register', publicLimiter, registerRouter);
 app.use('/api/registrations', registerRouter);
 app.use('/api/cases', casesRouter);
 app.use('/api/cases', sessionsRouter);  // /api/cases/:caseId/sessions

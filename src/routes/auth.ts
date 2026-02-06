@@ -4,17 +4,19 @@ import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
 import { verifyPassword, signToken } from '../lib/auth.js';
 import { requireAuth } from '../middleware/auth.js';
+import { loginSchema } from '../lib/validators.js';
 
 const router = Router();
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
+  const result = loginSchema.safeParse(req.body);
+  if (!result.success) {
     res.status(400).json({ success: false, message: '請輸入 Email 和密碼' });
     return;
   }
+
+  const { email, password } = result.data;
 
   const [user] = await db
     .select()

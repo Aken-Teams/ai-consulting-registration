@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../auth-context';
+import { Markdown } from '../components/Markdown';
 
 interface Message {
   role: 'user' | 'agent';
@@ -91,15 +92,25 @@ export function InterviewPage() {
   useEffect(() => {
     if (!sessionId || !token || !caseId) return;
 
-    const s = io(window.location.origin);
+    const s = io(window.location.origin, {
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
 
-    s.on('connect', () => {
+    const joinSession = () => {
       s.emit('auth', token, (ok: boolean) => {
         if (ok) {
           s.emit('joinSession', { sessionId, caseId: parseInt(caseId) });
         }
       });
-    });
+    };
+
+    s.on('connect', joinSession);
+
+    s.on('disconnect', () => setConnected(false));
+    s.on('reconnect', joinSession);
 
     s.on('sessionJoined', (data: { sessionId: number; sttAvailable: boolean }) => {
       setConnected(true);
@@ -222,6 +233,9 @@ export function InterviewPage() {
         <button className="btn-back-link" onClick={() => navigate(`/admin/cases/${caseId}`)}>← 返回案件</button>
         <h1>訪談工作台</h1>
         <div className="interview-header-right">
+          <span className={`connection-status ${connected ? 'online' : 'offline'}`}>
+            {connected ? '已連線' : '連線中斷'}
+          </span>
           <span className="completeness-badge">PRD {completeness}%</span>
           <button className="btn-end-session" onClick={endSession}>結束訪談</button>
         </div>
@@ -277,7 +291,11 @@ export function InterviewPage() {
               <div key={i} className={`chat-msg chat-msg-${msg.role}`}>
                 <div className="chat-msg-avatar">{msg.role === 'user' ? '顧' : 'AI'}</div>
                 <div className="chat-msg-body">
-                  <div className="chat-msg-content">{msg.content}</div>
+                  {msg.role === 'agent' ? (
+                    <Markdown content={msg.content} className="chat-msg-content" />
+                  ) : (
+                    <div className="chat-msg-content">{msg.content}</div>
+                  )}
                   <div className="chat-msg-time">{new Date(msg.timestamp).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               </div>
@@ -354,7 +372,7 @@ export function InterviewPage() {
               <div key={key} className={`prd-section ${sections[key] ? 'filled' : 'empty'}`}>
                 <h4>{label} {sections[key] ? '✓' : ''}</h4>
                 {sections[key] ? (
-                  <div className="prd-section-content">{sections[key]}</div>
+                  <Markdown content={sections[key]} className="prd-section-content" />
                 ) : (
                   <div className="prd-section-placeholder">等待訪談填入...</div>
                 )}
