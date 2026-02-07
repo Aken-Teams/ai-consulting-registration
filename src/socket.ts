@@ -3,15 +3,27 @@ import type OpenAI from 'openai';
 import { verifyToken } from './lib/auth.js';
 import { runAgent, type AgentContext } from './agent/agent.js';
 import { transcribeAudio, sttAvailable } from './lib/stt.js';
+import {
+  createIntakeSession,
+  getIntakeSession,
+  deleteIntakeSession,
+  runIntakeAgent,
+} from './agent/intake-agent.js';
 import { db } from './db/index.js';
 import { leads, cases, sessions, transcripts, artifacts } from './db/schema.js';
 import { eq } from 'drizzle-orm';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ARTIFACTS_DIR = join(__dirname, '..', 'data', 'artifacts');
+
+// Rate limiting for intake: per IP, 3 sessions/hr, 10 turns/session
+const intakeRateMap = new Map<string, { count: number; resetAt: number }>();
+const INTAKE_MAX_SESSIONS_PER_HOUR = 3;
+const INTAKE_MAX_TURNS = 10;
 
 // In-memory conversation history per session
 const sessionHistories = new Map<number, OpenAI.ChatCompletionMessageParam[]>();
@@ -131,8 +143,119 @@ export function setupSocketIO(io: SocketIOServer) {
       await handleUserMessage(io, currentSessionId, currentCaseId, data.text);
     });
 
+    // ─── Intake (public, no auth required) ───
+    let intakeClientId: string | null = null;
+    const intakeAudioBuffers: Buffer[] = [];
+
+    socket.on('intakeStart', (callback: (data: { clientId: string; sttAvailable: boolean }) => void) => {
+      const ip = socket.handshake.address;
+      const now = Date.now();
+
+      // Rate limit check
+      const rate = intakeRateMap.get(ip);
+      if (rate) {
+        if (now > rate.resetAt) {
+          rate.count = 0;
+          rate.resetAt = now + 3600_000;
+        }
+        if (rate.count >= INTAKE_MAX_SESSIONS_PER_HOUR) {
+          socket.emit('intakeError', { message: '操作過於頻繁，請稍後再試' });
+          return;
+        }
+        rate.count++;
+      } else {
+        intakeRateMap.set(ip, { count: 1, resetAt: now + 3600_000 });
+      }
+
+      intakeClientId = randomUUID();
+      createIntakeSession(intakeClientId);
+      console.log(`[Intake] Session started: ${intakeClientId}`);
+      callback({ clientId: intakeClientId, sttAvailable });
+    });
+
+    socket.on('intakeAudioChunk', (data: { chunk: ArrayBuffer }) => {
+      if (!intakeClientId) return;
+      intakeAudioBuffers.push(Buffer.from(data.chunk));
+    });
+
+    socket.on('intakeAudioStop', async () => {
+      if (!intakeClientId) return;
+
+      const chunks = intakeAudioBuffers.splice(0);
+      if (chunks.length === 0) return;
+
+      const audioBuffer = Buffer.concat(chunks);
+      socket.emit('intakeSttProcessing', true);
+
+      try {
+        const text = await transcribeAudio(audioBuffer);
+        socket.emit('intakeSttProcessing', false);
+
+        if (text) {
+          socket.emit('intakeSttResult', { text });
+        } else {
+          socket.emit('intakeSttResult', { text: null, error: '無法辨識語音' });
+        }
+      } catch (err) {
+        console.error('[Intake STT] Error:', err);
+        socket.emit('intakeSttProcessing', false);
+        socket.emit('intakeSttResult', { text: null, error: '語音轉文字失敗' });
+      }
+    });
+
+    socket.on('intakeMessage', async (data: { message: string }) => {
+      if (!intakeClientId) {
+        socket.emit('intakeError', { message: '請先開始對話' });
+        return;
+      }
+
+      const session = getIntakeSession(intakeClientId);
+      if (!session) {
+        socket.emit('intakeError', { message: '對話已過期，請重新開始' });
+        return;
+      }
+
+      if (session.turnCount >= INTAKE_MAX_TURNS) {
+        socket.emit('intakeError', { message: '已達對話上限，請繼續填寫報名表' });
+        return;
+      }
+
+      socket.emit('intakeAgentTyping', true);
+
+      try {
+        const result = await runIntakeAgent(intakeClientId, data.message, (chunk) => {
+          socket.emit('intakeAgentStream', { chunk });
+        });
+
+        socket.emit('intakeAgentTyping', false);
+
+        socket.emit('intakeMessage', {
+          role: 'agent',
+          content: result.reply,
+          timestamp: new Date().toISOString(),
+        });
+
+        socket.emit('intakeDataUpdate', {
+          data: result.data,
+          completeness: result.completeness,
+          isComplete: result.isComplete,
+          summary: result.summary,
+        });
+      } catch (err) {
+        console.error('[Intake Agent] Error:', err);
+        socket.emit('intakeAgentTyping', false);
+        socket.emit('intakeError', { message: '處理錯誤，請重試' });
+      }
+    });
+
     socket.on('disconnect', async () => {
       console.log(`[Socket] Client disconnected: ${socket.id}`);
+
+      // Cleanup intake session
+      if (intakeClientId) {
+        deleteIntakeSession(intakeClientId);
+        intakeClientId = null;
+      }
 
       // Save recording if exists
       if (currentSessionId && currentCaseId) {

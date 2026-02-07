@@ -23,6 +23,12 @@ interface Lead {
   utmMedium: string | null;
   utmCampaign: string | null;
   referrer: string | null;
+  voiceIntakeData: {
+    background?: string;
+    currentState?: string;
+    painPoints?: string;
+    expectedOutcome?: string;
+  } | null;
   createdAt: string;
 }
 
@@ -652,6 +658,33 @@ export function CaseDetailPage() {
                   {lead.utmMedium && <span className="source-tag">媒介: {lead.utmMedium}</span>}
                   {lead.utmCampaign && <span className="source-tag">活動: {lead.utmCampaign}</span>}
                   {lead.referrer && <span className="source-tag referrer-tag" title={lead.referrer}>推薦: {new URL(lead.referrer).hostname}</span>}
+                </div>
+              </div>
+            )}
+            {lead.voiceIntakeData && (
+              <div className="detail-field detail-field-full">
+                <span className="field-label">語音痛點分析</span>
+                <div className="voice-intake-result">
+                  {lead.voiceIntakeData.background && (
+                    <div className="voice-intake-result-item">
+                      <strong>背景：</strong>{lead.voiceIntakeData.background}
+                    </div>
+                  )}
+                  {lead.voiceIntakeData.currentState && (
+                    <div className="voice-intake-result-item">
+                      <strong>現況：</strong>{lead.voiceIntakeData.currentState}
+                    </div>
+                  )}
+                  {lead.voiceIntakeData.painPoints && (
+                    <div className="voice-intake-result-item">
+                      <strong>痛點：</strong>{lead.voiceIntakeData.painPoints}
+                    </div>
+                  )}
+                  {lead.voiceIntakeData.expectedOutcome && (
+                    <div className="voice-intake-result-item">
+                      <strong>期望：</strong>{lead.voiceIntakeData.expectedOutcome}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

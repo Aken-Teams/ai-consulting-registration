@@ -43,6 +43,15 @@ export function PainPoints() {
             </div>
           ))}
         </div>
+
+        <div className="pain-points-cta reveal">
+          <p className="pain-points-cta-text">
+            不確定該怎麼描述？讓 AI 助手用對話幫你整理
+          </p>
+          <a href="#voice-intake" className="btn btn-outline pain-points-cta-btn">
+            用說的，更簡單
+          </a>
+        </div>
       </div>
     </section>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ApiResponse } from '../../shared/types';
 
 const NEED_OPTIONS = ['流程優化', '作業自動化', '系統改造', '新工具導入', '其他'];
@@ -38,12 +38,36 @@ const emptyForm: FormData = {
   preferredTimeslots: [],
 };
 
-export function RegistrationForm({ abVariant }: { abVariant?: string }) {
+interface IntakeData {
+  background: string;
+  currentState: string;
+  painPoints: string;
+  expectedOutcome: string;
+}
+
+export function RegistrationForm({ abVariant, intakeData }: { abVariant?: string; intakeData?: IntakeData | null }) {
   const [form, setForm] = useState<FormData>({ ...emptyForm });
+  const [intakeApplied, setIntakeApplied] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [serverError, setServerError] = useState('');
+
+  // Pre-fill from voice intake
+  useEffect(() => {
+    if (intakeData && !intakeApplied) {
+      setForm(prev => ({
+        ...prev,
+        painPoints: intakeData.painPoints || prev.painPoints,
+        expectedOutcome: intakeData.expectedOutcome || prev.expectedOutcome,
+        description: [
+          intakeData.background ? `【背景】${intakeData.background}` : '',
+          intakeData.currentState ? `【現況】${intakeData.currentState}` : '',
+        ].filter(Boolean).join('\n') || prev.description,
+      }));
+      setIntakeApplied(true);
+    }
+  }, [intakeData, intakeApplied]);
 
   const set = (field: keyof FormData, value: string | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -112,6 +136,7 @@ export function RegistrationForm({ abVariant }: { abVariant?: string }) {
         utmCampaign: urlParams.get('utm_campaign') || undefined,
         referrer: document.referrer || undefined,
         abVariant: abVariant || undefined,
+        voiceIntakeData: intakeData || undefined,
       };
 
       const res = await fetch('/api/register', {

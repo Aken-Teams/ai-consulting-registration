@@ -3864,3 +3864,25 @@ td {
   .analytics-grid { grid-template-columns: 1fr; }
   .admin-main { padding: 12px; }
 }
+
+/* Voice Intake Result Display */
+.voice-intake-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.voice-intake-result-item {
+  padding: 8px 12px;
+  background: var(--bg-card, #f8fafc);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  border-left: 3px solid var(--primary, #6366f1);
+}
+
+.voice-intake-result-item strong {
+  color: var(--primary, #6366f1);
+  margin-right: 4px;
+}

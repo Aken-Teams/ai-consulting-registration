@@ -19,6 +19,12 @@ export const registerSchema = z.object({
   utmMedium: z.string().max(200).optional(),
   utmCampaign: z.string().max(200).optional(),
   referrer: z.string().max(500).optional(),
+  voiceIntakeData: z.object({
+    background: z.string().max(2000).optional(),
+    currentState: z.string().max(2000).optional(),
+    painPoints: z.string().max(2000).optional(),
+    expectedOutcome: z.string().max(2000).optional(),
+  }).optional(),
 });
 
 export const loginSchema = z.object({

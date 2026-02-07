@@ -58,6 +58,12 @@ export const leads = pgTable('leads', {
   utmMedium: varchar('utm_medium', { length: 200 }),
   utmCampaign: varchar('utm_campaign', { length: 200 }),
   referrer: varchar('referrer', { length: 500 }),
+  voiceIntakeData: jsonb('voice_intake_data').$type<{
+    background?: string;
+    currentState?: string;
+    painPoints?: string;
+    expectedOutcome?: string;
+  }>(),
   ...timestamps,
 });
 

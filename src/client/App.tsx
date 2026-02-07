@@ -1,17 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { PainPoints } from './components/PainPoints';
 import { HowItWorks } from './components/HowItWorks';
 import { ValueProps } from './components/ValueProps';
 import { UseCases } from './components/UseCases';
+import { VoiceIntake } from './components/VoiceIntake';
 import { RegistrationForm } from './components/RegistrationForm';
 import { Footer } from './components/Footer';
 import './styles/global.css';
 import './styles/animations.css';
 
+interface IntakeResult {
+  background: string;
+  currentState: string;
+  painPoints: string;
+  expectedOutcome: string;
+}
+
 export function App() {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [intakeResult, setIntakeResult] = useState<IntakeResult | null>(null);
   const [abVariant] = useState<'A' | 'B'>(() => {
     const stored = sessionStorage.getItem('ab_variant');
     if (stored === 'A' || stored === 'B') return stored;
@@ -80,6 +89,10 @@ export function App() {
     };
   }, []);
 
+  const handleIntakeComplete = useCallback((data: IntakeResult) => {
+    setIntakeResult(data);
+  }, []);
+
   return (
     <>
       <div className="scroll-progress">
@@ -92,10 +105,11 @@ export function App() {
       <main>
         <Hero variant={abVariant} />
         <PainPoints />
+        <VoiceIntake onComplete={handleIntakeComplete} />
         <HowItWorks />
         <ValueProps />
         <UseCases />
-        <RegistrationForm abVariant={abVariant} />
+        <RegistrationForm abVariant={abVariant} intakeData={intakeResult} />
       </main>
       <Footer />
     </>

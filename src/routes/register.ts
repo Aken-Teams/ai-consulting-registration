@@ -48,6 +48,7 @@ router.post('/', async (req, res) => {
       utmMedium: data.utmMedium?.trim() || null,
       utmCampaign: data.utmCampaign?.trim() || null,
       referrer: data.referrer?.trim() || null,
+      voiceIntakeData: data.voiceIntakeData || null,
     }).returning();
 
     // Auto-create a case for this lead
