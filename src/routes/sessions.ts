@@ -96,4 +96,49 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// GET /api/sessions/:id/export — export transcript as markdown
+router.get('/:id/export', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ success: false, message: '無效的 session ID' });
+      return;
+    }
+
+    const result = await db.query.sessions.findFirst({
+      where: eq(sessions.id, id),
+      with: { transcripts: { orderBy: (t, { asc }) => [asc(t.sequenceNumber)] } },
+    });
+
+    if (!result) {
+      res.status(404).json({ success: false, message: '找不到訪談' });
+      return;
+    }
+
+    const SPEAKER_MAP: Record<string, string> = { consultant: '顧問', agent: 'AI 助手', client: '客戶' };
+    const duration = result.durationSeconds
+      ? `${Math.floor(result.durationSeconds / 60)} 分 ${result.durationSeconds % 60} 秒`
+      : '進行中';
+
+    let md = `# 訪談逐字稿\n\n`;
+    md += `- **Session**: #${result.id}\n`;
+    md += `- **開始時間**: ${result.startedAt.toLocaleString('zh-TW')}\n`;
+    md += `- **時長**: ${duration}\n`;
+    md += `- **訊息數**: ${result.transcripts.length}\n\n---\n\n`;
+
+    for (const t of result.transcripts) {
+      const speaker = SPEAKER_MAP[t.speaker] || t.speaker;
+      const time = t.createdAt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      md += `### ${speaker} (${time})\n\n${t.content}\n\n---\n\n`;
+    }
+
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=transcript_session_${id}.md`);
+    res.send(md);
+  } catch (err) {
+    console.error('Transcript export error:', err);
+    res.status(500).json({ success: false, message: '匯出失敗' });
+  }
+});
+
 export default router;

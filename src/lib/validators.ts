@@ -14,6 +14,11 @@ export const registerSchema = z.object({
   expectedOutcome: z.string().max(2000).optional().default(''),
   existingTools: z.string().max(500).optional().default(''),
   preferredTimeslots: z.array(z.string()).optional(),
+  source: z.string().max(200).optional(),
+  utmSource: z.string().max(200).optional(),
+  utmMedium: z.string().max(200).optional(),
+  utmCampaign: z.string().max(200).optional(),
+  referrer: z.string().max(500).optional(),
 });
 
 export const loginSchema = z.object({
@@ -22,12 +27,16 @@ export const loginSchema = z.object({
 });
 
 const VALID_STATUSES = ['new', 'scheduled', 'interviewing', 'pending_review', 'prd_draft', 'prd_locked', 'mvp', 'closed'] as const;
+const VALID_PRIORITIES = ['urgent', 'high', 'normal', 'low'] as const;
 
 export const updateCaseSchema = z.object({
   status: z.enum(VALID_STATUSES).optional(),
-  consultantId: z.number().int().positive().optional(),
+  priority: z.enum(VALID_PRIORITIES).optional(),
+  consultantId: z.number().int().positive().nullable().optional(),
   scheduledAt: z.string().datetime().optional(),
   title: z.string().min(1).max(200).optional(),
+  notes: z.string().max(5000).optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
 }).refine(data => Object.keys(data).length > 0, { message: '無更新欄位' });
 
 export const prdSectionSchema = z.object({

@@ -33,7 +33,7 @@ function useCountUp(target: number, duration = 1200) {
   return { value, ref };
 }
 
-export function Hero() {
+export function Hero({ variant = 'A' }: { variant?: 'A' | 'B' }) {
   const scrollToForm = () => {
     document.getElementById('register')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -52,22 +52,28 @@ export function Hero() {
       </div>
 
       <div className="container hero-content">
-        <div className="hero-badge">AI 輔能 × 敏捷實戰</div>
+        <div className="hero-badge">{variant === 'A' ? 'AI 輔能 × 敏捷實戰' : 'AI 轉型第一步'}</div>
         <h1 className="hero-title">
-          不只是諮詢<br />
-          <span className="highlight">馬上談、馬上做、馬上用</span>
+          {variant === 'A' ? (
+            <>不只是諮詢<br /><span className="highlight">馬上談、馬上做、馬上用</span></>
+          ) : (
+            <>一次諮詢<br /><span className="highlight">解鎖您的 AI 應用潛力</span></>
+          )}
         </h1>
         <p className="hero-subtitle">
-          透過一對一深度訪談，30-60 分鐘內將您的需求轉化為<br className="hide-mobile" />
-          可立即部署上線的流程設計、系統雛型或 AI 應用方案
+          {variant === 'A' ? (
+            <>透過一對一深度訪談，30-60 分鐘內將您的需求轉化為<br className="hide-mobile" />可立即部署上線的流程設計、系統雛型或 AI 應用方案</>
+          ) : (
+            <>專業顧問 + AI 即時產出，從需求到方案不超過 60 分鐘<br className="hide-mobile" />零技術門檻，立即體驗 AI 驅動的業務升級</>
+          )}
         </p>
 
         <div className="hero-actions">
           <button className="btn btn-primary btn-lg pulse-btn" onClick={scrollToForm}>
-            預約 AI 輔能諮詢
+            {variant === 'A' ? '預約 AI 輔能諮詢' : '立即免費預約'}
             <span className="btn-arrow">&rarr;</span>
           </button>
-          <p className="hero-note">免費諮詢 &middot; 現場產出 &middot; 即刻可用</p>
+          <p className="hero-note">{variant === 'A' ? '免費諮詢 \u00b7 現場產出 \u00b7 即刻可用' : '30 分鐘見效 \u00b7 專業顧問 \u00b7 AI 即時產出'}</p>
         </div>
 
         <div className="hero-stats">

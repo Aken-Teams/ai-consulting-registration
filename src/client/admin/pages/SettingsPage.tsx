@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth-context';
+import { useI18n, Locale } from '../i18n';
+
+interface SystemInfo {
+  uptime: number;
+  db: string;
+  nodeVersion?: string;
+  memoryUsage?: number;
+}
 
 export function SettingsPage() {
   const { user, authFetch } = useAuth();
+  const { locale, setLocale, t } = useI18n();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+
+  useEffect(() => {
+    fetch('/api/health').then(r => r.json()).then(d => {
+      setSystemInfo(d);
+    }).catch(() => {});
+  }, []);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,7 +127,86 @@ export function SettingsPage() {
             </button>
           </form>
         </div>
+
+        {systemInfo && (
+          <div className="settings-card">
+            <h2>系統資訊</h2>
+            <div className="settings-fields">
+              <div className="settings-field">
+                <span className="settings-label">伺服器狀態</span>
+                <span className={`status-indicator ${systemInfo.db === 'connected' ? 'status-ok' : 'status-err'}`}>
+                  {systemInfo.db === 'connected' ? '正常運作' : '連線異常'}
+                </span>
+              </div>
+              <div className="settings-field">
+                <span className="settings-label">資料庫</span>
+                <span>{systemInfo.db === 'connected' ? 'PostgreSQL 已連線' : '未連線'}</span>
+              </div>
+              <div className="settings-field">
+                <span className="settings-label">運行時間</span>
+                <span>{formatUptime(systemInfo.uptime)}</span>
+              </div>
+              <div className="settings-field">
+                <span className="settings-label">技術棧</span>
+                <span>React 18 + Express + PostgreSQL</span>
+              </div>
+              <div className="settings-field">
+                <span className="settings-label">版本</span>
+                <span>v1.0.0</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="settings-card">
+          <h2>{t('settings.language')}</h2>
+          <div className="settings-fields">
+            <div className="settings-field">
+              <span className="settings-label">語言 / Language</span>
+              <div className="locale-toggle">
+                {(['zh-TW', 'en-US'] as Locale[]).map(loc => (
+                  <button
+                    key={loc}
+                    className={`locale-btn ${locale === loc ? 'active' : ''}`}
+                    onClick={() => setLocale(loc)}
+                  >
+                    {loc === 'zh-TW' ? '繁體中文' : 'English'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-card">
+          <h2>快捷鍵</h2>
+          <div className="settings-fields">
+            <div className="settings-field">
+              <span className="settings-label"><kbd>Ctrl + K</kbd></span>
+              <span>指令面板</span>
+            </div>
+            <div className="settings-field">
+              <span className="settings-label"><kbd>?</kbd></span>
+              <span>快捷鍵說明</span>
+            </div>
+            <div className="settings-field">
+              <span className="settings-label"><kbd>Esc</kbd></span>
+              <span>關閉對話框</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
+}
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const parts = [];
+  if (d > 0) parts.push(`${d} 天`);
+  if (h > 0) parts.push(`${h} 小時`);
+  parts.push(`${m} 分鐘`);
+  return parts.join(' ');
 }

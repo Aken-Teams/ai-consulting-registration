@@ -22,6 +22,8 @@ export const userRoleEnum = pgEnum('user_role', ['admin', 'consultant']);
 
 export const speakerRoleEnum = pgEnum('speaker_role', ['consultant', 'client', 'agent']);
 
+export const casePriorityEnum = pgEnum('case_priority', ['urgent', 'high', 'normal', 'low']);
+
 // ─── Users (admin / consultant) ───
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -51,6 +53,11 @@ export const leads = pgTable('leads', {
   expectedOutcome: text('expected_outcome'),
   existingTools: text('existing_tools'),
   preferredTimeslots: jsonb('preferred_timeslots').$type<string[]>(),
+  source: varchar('source', { length: 200 }),
+  utmSource: varchar('utm_source', { length: 200 }),
+  utmMedium: varchar('utm_medium', { length: 200 }),
+  utmCampaign: varchar('utm_campaign', { length: 200 }),
+  referrer: varchar('referrer', { length: 500 }),
   ...timestamps,
 });
 
@@ -60,9 +67,13 @@ export const cases = pgTable('cases', {
   leadId: integer('lead_id').references(() => leads.id, { onDelete: 'cascade' }).notNull(),
   consultantId: integer('consultant_id').references(() => users.id),
   status: caseStatusEnum('status').default('new').notNull(),
+  priority: casePriorityEnum('priority').default('normal').notNull(),
   title: varchar('title', { length: 300 }).notNull(),
   scheduledAt: timestamp('scheduled_at', { mode: 'date', withTimezone: true }),
   completedAt: timestamp('completed_at', { mode: 'date', withTimezone: true }),
+  notes: text('notes'),
+  tags: jsonb('tags').$type<string[]>().default([]),
+  isPinned: boolean('is_pinned').default(false).notNull(),
   ...timestamps,
 }, (table) => [
   index('cases_lead_idx').on(table.leadId),
@@ -161,6 +172,63 @@ export const agentEvents = pgTable('agent_events', {
   index('agent_events_session_idx').on(table.sessionId),
 ]);
 
+// ─── Notifications ───
+export const notifications = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // 'new_lead', 'status_change', 'comment', 'prd_locked'
+  title: varchar('title', { length: 200 }).notNull(),
+  message: text('message').notNull(),
+  link: varchar('link', { length: 500 }),
+  isRead: boolean('is_read').default(false).notNull(),
+  ...timestamps,
+}, (table) => [
+  index('notifications_user_idx').on(table.userId),
+  index('notifications_read_idx').on(table.userId, table.isRead),
+]);
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+// ─── Case Comments ───
+export const caseComments = pgTable('case_comments', {
+  id: serial('id').primaryKey(),
+  caseId: integer('case_id').references(() => cases.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  content: text('content').notNull(),
+  ...timestamps,
+}, (table) => [
+  index('case_comments_case_idx').on(table.caseId),
+]);
+
+// ─── Page Views (Landing Page Analytics) ───
+export const pageViews = pgTable('page_views', {
+  id: serial('id').primaryKey(),
+  path: varchar('path', { length: 500 }).notNull(),
+  referrer: varchar('referrer', { length: 1000 }),
+  userAgent: varchar('user_agent', { length: 500 }),
+  ip: varchar('ip', { length: 45 }),
+  createdAt: timestamp('created_at', { mode: 'date', precision: 3, withTimezone: true })
+    .defaultNow().notNull(),
+}, (table) => [
+  index('page_views_path_idx').on(table.path),
+  index('page_views_created_idx').on(table.createdAt),
+]);
+
+// ─── Case Status History (Audit Log) ───
+export const caseStatusHistory = pgTable('case_status_history', {
+  id: serial('id').primaryKey(),
+  caseId: integer('case_id').references(() => cases.id, { onDelete: 'cascade' }).notNull(),
+  userId: integer('user_id').references(() => users.id),
+  fromStatus: caseStatusEnum('from_status'),
+  toStatus: caseStatusEnum('to_status').notNull(),
+  note: text('note'),
+  ...timestamps,
+}, (table) => [
+  index('case_status_history_case_idx').on(table.caseId),
+]);
+
 // ─── Artifacts ───
 export const artifacts = pgTable('artifacts', {
   id: serial('id').primaryKey(),
@@ -191,6 +259,8 @@ export const casesRelations = relations(cases, ({ one, many }) => ({
   prdVersions: many(prdVersions),
   agentEvents: many(agentEvents),
   artifacts: many(artifacts),
+  comments: many(caseComments),
+  statusHistory: many(caseStatusHistory),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one, many }) => ({
@@ -217,4 +287,14 @@ export const agentEventsRelations = relations(agentEvents, ({ one }) => ({
 export const artifactsRelations = relations(artifacts, ({ one }) => ({
   case_: one(cases, { fields: [artifacts.caseId], references: [cases.id] }),
   prdVersion: one(prdVersions, { fields: [artifacts.prdVersionId], references: [prdVersions.id] }),
+}));
+
+export const caseCommentsRelations = relations(caseComments, ({ one }) => ({
+  case_: one(cases, { fields: [caseComments.caseId], references: [cases.id] }),
+  user: one(users, { fields: [caseComments.userId], references: [users.id] }),
+}));
+
+export const caseStatusHistoryRelations = relations(caseStatusHistory, ({ one }) => ({
+  case_: one(cases, { fields: [caseStatusHistory.caseId], references: [cases.id] }),
+  user: one(users, { fields: [caseStatusHistory.userId], references: [users.id] }),
 }));

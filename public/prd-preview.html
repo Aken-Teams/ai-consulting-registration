@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PRD 預覽 — AI 輔能諮詢</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans TC', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.7; }
+    .preview-header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+      color: white; padding: 32px 24px; text-align: center;
+    }
+    .preview-header h1 { font-size: 1.5rem; margin-bottom: 8px; }
+    .preview-meta { font-size: 0.875rem; opacity: 0.8; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .preview-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+    .badge-locked { background: #10b981; color: white; }
+    .badge-draft { background: #f59e0b; color: white; }
+    .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+    .section-card {
+      background: white; border-radius: 12px; padding: 24px;
+      margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .section-card h3 { font-size: 1rem; color: #6366f1; margin-bottom: 12px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+    .section-content { font-size: 0.9375rem; white-space: pre-wrap; color: #334155; }
+    .section-content p { margin-bottom: 8px; }
+    .section-empty { color: #94a3b8; font-style: italic; }
+    .completeness-bar { height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: 12px; overflow: hidden; }
+    .completeness-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #a855f7); border-radius: 3px; transition: width 0.3s; }
+    .loading { text-align: center; padding: 80px 24px; color: #64748b; font-size: 1.125rem; }
+    .error { text-align: center; padding: 80px 24px; color: #dc2626; font-size: 1.125rem; }
+    .footer { text-align: center; padding: 24px; font-size: 0.75rem; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading" id="loading">載入 PRD 中...</div>
+  </div>
+  <script>
+    const SECTION_LABELS = {
+      background: '背景與目標', users: '使用者與情境', scope: '需求範圍',
+      asIs: '現況流程', toBe: '目標流程', userStories: '功能需求',
+      acceptance: '驗收標準', dataModel: '資料與欄位', permissions: '權限與角色',
+      nonFunctional: '非功能需求', kpi: '成功指標', risks: '風險與依賴',
+      mvpScope: 'MVP 切分建議',
+    };
+
+    (async function() {
+      const path = window.location.pathname;
+      const match = path.match(/\/prd-preview\/(\d+)/);
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (!match || !token) {
+        document.getElementById('app').innerHTML = '<div class="error">無效的預覽連結</div>';
+        return;
+      }
+
+      const caseId = match[1];
+      try {
+        const res = await fetch(`/api/prd-preview/${caseId}?token=${token}`);
+        const data = await res.json();
+
+        if (!data.success) {
+          document.getElementById('app').innerHTML = `<div class="error">${data.message || '載入失敗'}</div>`;
+          return;
+        }
+
+        const d = data.data;
+        const badgeClass = d.isLocked ? 'badge-locked' : 'badge-draft';
+        const badgeText = d.isLocked ? '已鎖版' : '草稿';
+
+        let html = `
+          <div class="preview-header">
+            <h1>${esc(d.company)} — PRD</h1>
+            <div class="preview-meta">
+              <span>版本 v${d.versionNumber}</span>
+              <span class="preview-badge ${badgeClass}">${badgeText}</span>
+              <span>完成度 ${d.completeness}%</span>
+              <span>更新: ${new Date(d.updatedAt).toLocaleString('zh-TW')}</span>
+            </div>
+            <div class="completeness-bar"><div class="completeness-fill" style="width:${d.completeness}%"></div></div>
+          </div>
+          <div class="container">
+        `;
+
+        for (const [key, label] of Object.entries(SECTION_LABELS)) {
+          const content = d.sections[key];
+          html += `
+            <div class="section-card">
+              <h3>${label}</h3>
+              <div class="${content ? 'section-content' : 'section-empty'}">
+                ${content ? simpleMarkdown(content) : '尚未填入'}
+              </div>
+            </div>
+          `;
+        }
+
+        html += `</div><div class="footer">由 AI 輔能諮詢系統產生</div>`;
+        document.getElementById('app').innerHTML = html;
+      } catch (err) {
+        document.getElementById('app').innerHTML = '<div class="error">載入失敗，請確認連結是否正確</div>';
+      }
+    })();
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function simpleMarkdown(text) {
+      return esc(text)
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+        .replace(/^### (.*$)/gm, '<h4>$1</h4>')
+        .replace(/^## (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^- (.*$)/gm, '<li>$1</li>')
+        .replace(/\n/g, '<br/>');
+    }
+  </script>
+</body>
+</html>

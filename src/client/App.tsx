@@ -12,6 +12,13 @@ import './styles/animations.css';
 
 export function App() {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [abVariant] = useState<'A' | 'B'>(() => {
+    const stored = sessionStorage.getItem('ab_variant');
+    if (stored === 'A' || stored === 'B') return stored;
+    const variant = Math.random() < 0.5 ? 'A' : 'B';
+    sessionStorage.setItem('ab_variant', variant);
+    return variant as 'A' | 'B';
+  });
 
   useEffect(() => {
     // Scroll-reveal observer
@@ -37,8 +44,38 @@ export function App() {
     };
     window.addEventListener('scroll', onScroll, { passive: true });
 
+    // Track page view with A/B variant
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: window.location.pathname, variant: abVariant }),
+    }).catch(() => {});
+
+    // Section visibility tracking
+    const tracked = new Set<string>();
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const sectionId = entry.target.getAttribute('id');
+            if (sectionId && !tracked.has(sectionId)) {
+              tracked.add(sectionId);
+              fetch('/api/track', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: `/#${sectionId}` }),
+              }).catch(() => {});
+            }
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+    document.querySelectorAll('section[id]').forEach((el) => sectionObserver.observe(el));
+
     return () => {
       observer.disconnect();
+      sectionObserver.disconnect();
       window.removeEventListener('scroll', onScroll);
     };
   }, []);
@@ -53,12 +90,12 @@ export function App() {
       </div>
       <Header />
       <main>
-        <Hero />
+        <Hero variant={abVariant} />
         <PainPoints />
         <HowItWorks />
         <ValueProps />
         <UseCases />
-        <RegistrationForm />
+        <RegistrationForm abVariant={abVariant} />
       </main>
       <Footer />
     </>

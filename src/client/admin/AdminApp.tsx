@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth-context';
+import { I18nProvider } from './i18n';
 import { Sidebar } from './components/Sidebar';
+import { CommandPalette } from './components/CommandPalette';
+import { NotificationBell } from './components/NotificationBell';
+import { KeyboardHelp } from './components/KeyboardHelp';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
@@ -56,11 +60,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 }
 
 function AdminLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <AuthGuard>
+      <CommandPalette />
+      <KeyboardHelp />
       <div className="admin-layout">
-        <Sidebar />
+        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="選單">
+          <span /><span /><span />
+        </button>
+        {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+        <div className={`sidebar-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
+          <Sidebar onNavigate={() => setSidebarOpen(false)} />
+        </div>
         <main className="admin-main">
+          <div className="admin-topbar">
+            <kbd className="topbar-shortcut" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}>Ctrl+K 指令</kbd>
+            <NotificationBell />
+          </div>
           <Routes>
             <Route index element={<DashboardPage />} />
             <Route path="cases/:id" element={<CaseDetailPage />} />
@@ -77,6 +94,7 @@ function AdminLayout() {
 export function AdminApp() {
   return (
     <ErrorBoundary>
+      <I18nProvider>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -85,6 +103,7 @@ export function AdminApp() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </I18nProvider>
     </ErrorBoundary>
   );
 }

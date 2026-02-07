@@ -227,6 +227,28 @@ export function InterviewPage() {
   const completeness = prd?.content?.metadata?.completeness || 0;
   const sections = prd?.content?.sections || {};
 
+  // Suggested questions based on empty PRD sections
+  const QUESTION_SUGGESTIONS: Record<string, string[]> = {
+    background: ['可以請您描述一下這個專案的背景和主要目標嗎？', '驅動這個專案的商業需求是什麼？'],
+    users: ['主要的使用者是誰？有哪些不同的角色？', '使用者目前的工作流程是怎樣的？'],
+    scope: ['這個專案的核心範圍是什麼？有哪些是明確不做的？'],
+    asIs: ['目前的作業流程是怎麼進行的？有哪些手動步驟？'],
+    toBe: ['理想的流程應該是什麼樣子？哪些步驟希望自動化？'],
+    userStories: ['最重要的功能是什麼？使用者需要能做哪些事？'],
+    acceptance: ['如何判斷這個功能是成功的？驗收標準是什麼？'],
+    dataModel: ['系統需要處理哪些資料？有哪些重要的欄位？'],
+    permissions: ['有哪些不同的權限角色？誰可以做什麼操作？'],
+    nonFunctional: ['對效能、安全性、可用性有什麼要求？'],
+    kpi: ['如何衡量這個專案的成功？關鍵指標是什麼？'],
+    risks: ['有哪些潛在的風險或依賴？技術限制是什麼？'],
+    mvpScope: ['如果要分階段實作，第一階段（MVP）應該包含什麼？'],
+  };
+
+  const suggestedQuestions = Object.entries(QUESTION_SUGGESTIONS)
+    .filter(([key]) => !sections[key])
+    .flatMap(([key, qs]) => qs.map(q => ({ section: key, question: q })))
+    .slice(0, 5);
+
   return (
     <div className="interview-page">
       <div className="interview-header">
@@ -274,6 +296,27 @@ export function InterviewPage() {
                   <ul>{summary.openQuestions.map((q, i) => <li key={i}>{q}</li>)}</ul>
                 </>
               )}
+            </div>
+          )}
+          {suggestedQuestions.length > 0 && (
+            <div className="sidebar-section">
+              <h3>建議提問</h3>
+              <div className="suggestion-list">
+                {suggestedQuestions.map((sq, i) => (
+                  <button
+                    key={i}
+                    className="suggestion-chip"
+                    onClick={() => {
+                      setInput(sq.question);
+                      inputRef.current?.focus();
+                    }}
+                    title={`針對「${PRD_LABELS[sq.section]}」的建議提問`}
+                  >
+                    <span className="suggestion-section">{PRD_LABELS[sq.section]}</span>
+                    <span className="suggestion-text">{sq.question}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </aside>

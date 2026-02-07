@@ -38,7 +38,7 @@ const emptyForm: FormData = {
   preferredTimeslots: [],
 };
 
-export function RegistrationForm() {
+export function RegistrationForm({ abVariant }: { abVariant?: string }) {
   const [form, setForm] = useState<FormData>({ ...emptyForm });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -102,10 +102,22 @@ export function RegistrationForm() {
 
     setSubmitting(true);
     try {
+      // Capture UTM params and referrer
+      const urlParams = new URLSearchParams(window.location.search);
+      const trackingData = {
+        ...form,
+        source: urlParams.get('source') || undefined,
+        utmSource: urlParams.get('utm_source') || undefined,
+        utmMedium: urlParams.get('utm_medium') || undefined,
+        utmCampaign: urlParams.get('utm_campaign') || undefined,
+        referrer: document.referrer || undefined,
+        abVariant: abVariant || undefined,
+      };
+
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(trackingData),
       });
       const data: ApiResponse = await res.json();
 
